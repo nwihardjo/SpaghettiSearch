@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-func main() {
+func main(){
 	fmt.Println("Crawler started...")
 
 	var visited []string
