@@ -51,6 +51,25 @@ type (
 	}
 )
 
+// TODO: to be completed
+func DB_init(ctx context.Context, logger * logger.Logger)([]interface{}, error){
+	/*
+		return: a set of database interface mapped to its function
+		prefix inv* refers to inverted table
+		prefix for* refers to forward table
+	*/
+	invKeyword_body := NewBadgerDB_Inverted(ctx, base_dir+"invKeyword_body/", logger)
+	invKeyword_page := NewBadgerDB_Inverted(ctx, base_dir+"invKeyword_title/", logger)
+	forWord_wordId := NewBadgerDB(ctx, base_dir+"forWord_wordId/", logger)
+	forWordId_word := NewBadgerDB(ctx, base_dir+"forWordId_word/", logger)
+	forURL_docId := NewBadgerDB(ctx, base_dir+"forURL_docId/", logger)
+	forDocId_URL := NewBadgerDB(ctx, base_dir+"forDocId_URL/", logger)
+	forIndexes := NewBadgerDB(ctx, base_dir+"forIndexes/", logger)
+}
+
+
+
+
 func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger) (DB_Inverted, error) {
 	opts := badger.DefaultOptions
 	// set SyncWrites to False for performance increase but may cause loss of data
@@ -91,6 +110,15 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger) (DB, er
 	go bdb.runGC(ctx)
 	return bdb, nil
 }
+
+func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, appendedValue []byte) error {
+	value, err = bdb_i.Get(ctx, key)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}	
+	
+	
 
 func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err error) {
 	err = bdb.db.View(func(txn *badger.Txn) error {
