@@ -22,6 +22,18 @@ var (
 )
 
 type (
+	DB_Inverted interface {
+		DB
+		// TODO: implement AppendValue based on the schema
+		//AppendValue(ctx context.Context, key []byte, appendedValue []byte) error
+	}	
+	
+	BadgerDB_Inverted struct {
+		BadgerDB
+	}
+)
+
+type (
 	// TODO: add logger debug in each function
 	DB interface {
 		Get(ctx context.Context, key []byte) (value []byte, err error)
@@ -29,7 +41,7 @@ type (
 		Has(ctx context.Context, key []byte) (bool, error)
 		Delete(ctx context.Context, key []byte) error
 		Close(ctx context.Context, cancel context.CancelFunc) error
-		// TODO: Iterate functionality to be determined
+		// TODO: Iterate functionality to be implemented
 		Iterate(ctx context.Context) error
 	}
 
@@ -38,6 +50,25 @@ type (
 		logger *logger.Logger
 	}
 )
+
+func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger) (DB_Inverted, error) {
+	opts := badger.DefaultOptions
+	// set SyncWrites to False for performance increase but may cause loss of data
+	opts.SyncWrites = true
+	opts.Dir, opts.ValueDir = dir, dir
+
+	badgerDB, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
+	bdb_i := &BadgerDB_Inverted{ BadgerDB{badgerDB, logger}	}
+
+	// run garbage collection in advance
+	go bdb_i.runGC(ctx)
+	return bdb_i, nil
+}
 
 func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger) (DB, error) {
 	opts := badger.DefaultOptions
