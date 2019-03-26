@@ -1,12 +1,12 @@
-package db_wrapper
+package database
 
 import (
 	"context"
-	"os"
 	"time"
 	"fmt"
 	"log"
 	"github.com/dgraph-io/badger"
+	"github.com/apsdehal/go-logger"
 )
 
 const (
@@ -23,29 +23,28 @@ var (
 )
 
 type (
-	// TODO: investigate namespace necessity for additional arguments
 	// TODO: add logger debug in each function
 	DB interface {
 		Get(ctx context.Context, key []byte) (value []byte, err error)
-		Set(ctx context.Context, key [] byte, value []byte) error
+		Set(ctx context.Context, key []byte, value []byte) error
 		Has(ctx context.Context, key []byte) (bool, error)
 		Delete(ctx context.Context, key []byte) error
-		Close(ctx context.Context) error
+		Close(ctx context.Context, cancel context.CancelFunc) error
+		// TODO: Iterate functionality to be determined
+		Iterate(ctx context.Context) error
 	}
 
 	BadgerDB struct {
 		db	*badger.DB
-		logger 	Logger
+		logger 	*logger.Logger
 	}
 )
 
-func NewBadgerDB (ctx context.Context, dir string, logger log.Logger)(DB, error){
-	// will open an existing directory, or create a new one if dir not exist 
-
+func NewBadgerDB (ctx context.Context, dir string, logger *logger.Logger)(DB, error){
 	opts := badger.DefaultOptions
 	// set SyncWrites to False for performance increase but may cause loss of data
 	opts.SyncWrites = true
-	opts.Dir, opts.ValueDir = dataDir, dataDir
+	opts.Dir, opts.ValueDir = dir, dir
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
@@ -55,8 +54,7 @@ func NewBadgerDB (ctx context.Context, dir string, logger log.Logger)(DB, error)
 		
 	bdb := &BadgerDB {
 		db:	badgerDB,
-		// TODO: double check, possible bug
-		logger:	logger.With("module", "db"),
+		logger:	logger,
 	}
 
 	// run garbage collection in advance	
@@ -88,9 +86,10 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 
 	if err != nil { return nil, err }
 	return value, nil
+}
 
 func (bdb *BadgerDB) Set(ctx context.Context, key []byte, value []byte) error {
-	err := bdb.db.Update(func txn *badger.Txn) error {
+	err := bdb.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, value)
 	})
 
@@ -124,7 +123,9 @@ func (bdb *BadgerDB) Delete(ctx context.Context, key []byte) error {
 	return err
 }
 
-func (bdb *BadgerDB) Close() error {
+func (bdb *BadgerDB) Close(ctx context.Context, cancel context.CancelFunc) error {
+	// perform cancellation of the running process using context
+	cancel()
 	return bdb.db.Close()
 }
 
@@ -147,48 +148,65 @@ func (bdb *BadgerDB) runGC(ctx context.Context){
 	}
 }
 
+func (bdb *BadgerDB) Iterate(ctx context.Context) error {
+	err := bdb.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+  		defer it.Close()
+  		
+		for it.Rewind(); it.Valid(); it.Next() {
+    			item := it.Item()
+    			k := item.Key()
+    			err := item.Value(func(v []byte) error {
+      				fmt.Printf("\tkey=%s, value=%s\n", k, v)
+     				return nil
+    			})
+    			if err != nil {
+      				return err
+    			}
+		}
+  		return nil
+	})
+	return err
+}
+
 //func main() {
-	// testing db
-//	tmpDir := "./database/"
-//	opts:= badger.DefaultOptions
-//	opts.Dir = tmpDir
-//	opts.ValueDir = tmpDir
-//	db, err := badger.Open(opts)
+//	// testing db instantaneous
+//	dir_ := "./database/"
+//	log, err := logger.New("test", 1)
+//	if err != nil { panic(err) }
 //
-//	if err != nil {
-//		log.Fatal(err) 
-//	}
+//	ctx, cancel := context.WithCancel(context.Background())
 //	
-//	defer db.Close()
+//	db_temp, err := NewBadgerDB(ctx, dir_, log)
+//	if err != nil { fmt.Println(err)}
+//	defer db_temp.Close(ctx, cancel)
+//}	
+//	// db interface testing
+//	fmt.Println("\tTESTING: Initial iteration")
+//	db_temp.Iterate(ctx)
+//	fmt.Println("\tTESTING: Setting values, and getting them back")
+//	db_temp.Set(ctx, []byte("temp"), []byte("hi"))
+//	value, err := db_temp.Get(ctx, []byte("temp"))
+//	fmt.Printf("\tkey=temp, value=%s\n", value)
+//	fmt.Println("\tTESTING: has functionality")
+//	db_has, err := db_temp.Has(ctx, []byte("answer"))
+//	fmt.Printf("\tdb_temp has anwer keys: %s\n", db_has)
+//	fmt.Println("\tTESTING: deleting keys")
+//	db_temp.Delete(ctx, []byte("temp"))
+//	fmt.Println("\tlast iteration")
+//	db_temp.Iterate(ctx)
+//	
+//	dir := "./db/"	
+//	opts := badger.DefaultOptions
+//	// set SyncWrites to False for performance increase but may cause loss of data
+//	opts.SyncWrites = true
+//	opts.Dir, opts.ValueDir = dir, dir
 //
-//	// update db
-//	err1 := db.Update(func(txn *badger.Txn) error {
-//		err := txn.Set([]byte("answer"), []byte("42"))
-//		return err
-//	})
-//	
-//	if err1 != nil {
-//		log.Fatal(err)
-//	}
-//
-//	err = db.View(func(txn *badger.Txn) error {
-//		item, err := txn.Get([]byte("answer"))
-//	
-//		if err != nil {log.Fatal(err)}
-//	
-//		var valCopy []byte
-//		err1 := item.Value(func(val []byte) error{
-//			fmt.Printf("The key 'answer' has value of: %s \n", val)
-//			valCopy = append([]byte{}, val...)
-//			return nil
-//		})
-//
-//		if err1 != nil {log.Fatal(err)}
+//	badgerDB, err := badger.Open(opts)
 //		
-//		fmt.Printf("The key 'answer' has value of: %s \n", valCopy)
-//		
-//		return nil
-//	})
-//
-//	fmt.Println("db opened and closed")
+//	defer badgerDB.Close()
+//	bdb := &BadgerDB_Inverted {
+//		db:	badgerDB,
 //}
