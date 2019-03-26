@@ -1,4 +1,4 @@
-package database
+package main
 
 import (
 	"context"
@@ -174,7 +174,7 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 
 //func main() {
 //	// testing db instantaneous
-//	dir_ := "./database/"
+//	dir_ := "../db_data/"
 //	log, err := logger.New("test", 1)
 //	if err != nil { panic(err) }
 //
@@ -183,7 +183,7 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 //	db_temp, err := NewBadgerDB(ctx, dir_, log)
 //	if err != nil { fmt.Println(err)}
 //	defer db_temp.Close(ctx, cancel)
-//}
+//
 //	// db interface testing
 //	fmt.Println("\tTESTING: Initial iteration")
 //	db_temp.Iterate(ctx)
@@ -198,16 +198,4 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 //	db_temp.Delete(ctx, []byte("temp"))
 //	fmt.Println("\tlast iteration")
 //	db_temp.Iterate(ctx)
-//
-//	dir := "./db/"
-//	opts := badger.DefaultOptions
-//	// set SyncWrites to False for performance increase but may cause loss of data
-//	opts.SyncWrites = true
-//	opts.Dir, opts.ValueDir = dir, dir
-//
-//	badgerDB, err := badger.Open(opts)
-//
-//	defer badgerDB.Close()
-//	bdb := &BadgerDB_Inverted {
-//		db:	badgerDB,
 //}
