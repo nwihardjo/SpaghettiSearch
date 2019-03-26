@@ -2,20 +2,19 @@ package database
 
 import (
 	"context"
-	"time"
 	"fmt"
-	"log"
-	"github.com/dgraph-io/badger"
 	"github.com/apsdehal/go-logger"
+	"github.com/dgraph-io/badger"
+	"log"
+	"time"
 )
 
 const (
 	// Default values are used. For garbage-collection purposes
 	// TODO: to be fine-tuned
 	badgerDiscardRatio = 0.5
-	badgerGCInterval = 10 * time.Minute
+	badgerGCInterval   = 10 * time.Minute
 )
-
 
 var (
 	// BadgerAlertNamespace defines the alerts BadgerDB namespace
@@ -35,12 +34,12 @@ type (
 	}
 
 	BadgerDB struct {
-		db	*badger.DB
-		logger 	*logger.Logger
+		db     *badger.DB
+		logger *logger.Logger
 	}
 )
 
-func NewBadgerDB (ctx context.Context, dir string, logger *logger.Logger)(DB, error){
+func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger) (DB, error) {
 	opts := badger.DefaultOptions
 	// set SyncWrites to False for performance increase but may cause loss of data
 	opts.SyncWrites = true
@@ -50,27 +49,27 @@ func NewBadgerDB (ctx context.Context, dir string, logger *logger.Logger)(DB, er
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
-	}	
-		
-	bdb := &BadgerDB {
-		db:	badgerDB,
-		logger:	logger,
 	}
 
-	// run garbage collection in advance	
+	bdb := &BadgerDB{
+		db:     badgerDB,
+		logger: logger,
+	}
+
+	// run garbage collection in advance
 	go bdb.runGC(ctx)
 	return bdb, nil
 }
 
 func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err error) {
-	err = bdb.db.View(func(txn *badger.Txn) error{
+	err = bdb.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
-		
+
 		if err != nil {
 			log.Fatal(err)
-			return err 
+			return err
 		}
-	
+
 		// value needed to be copied as it only lasts when the transaction is open
 		err = item.Value(func(val []byte) error {
 			value = append([]byte{}, val...)
@@ -84,7 +83,9 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 		return nil
 	})
 
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return value, nil
 }
 
@@ -103,10 +104,10 @@ func (bdb *BadgerDB) Set(ctx context.Context, key []byte, value []byte) error {
 func (bdb *BadgerDB) Has(ctx context.Context, key []byte) (ok bool, err error) {
 	_, err = bdb.Get(ctx, key)
 	switch err {
-		case badger.ErrKeyNotFound:
-			ok, err = false, nil
-		case nil:
-			ok, err = true, nil
+	case badger.ErrKeyNotFound:
+		ok, err = false, nil
+	case nil:
+		ok, err = true, nil
 	}
 	return
 }
@@ -116,7 +117,7 @@ func (bdb *BadgerDB) Delete(ctx context.Context, key []byte) error {
 		err := txn.Delete(key)
 		if err != nil {
 			bdb.logger.Debugf("Failed to delete key: %v")
-			return err 
+			return err
 		}
 		return nil
 	})
@@ -129,11 +130,11 @@ func (bdb *BadgerDB) Close(ctx context.Context, cancel context.CancelFunc) error
 	return bdb.db.Close()
 }
 
-func (bdb *BadgerDB) runGC(ctx context.Context){
+func (bdb *BadgerDB) runGC(ctx context.Context) {
 	ticker := time.NewTicker(badgerGCInterval)
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			err := bdb.db.RunValueLogGC(badgerDiscardRatio)
 			if err != nil {
 				if err == badger.ErrNoRewrite {
@@ -142,7 +143,7 @@ func (bdb *BadgerDB) runGC(ctx context.Context){
 					bdb.logger.Errorf("Failed to GC BadgerDB: %v", err)
 				}
 			}
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -153,20 +154,20 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchSize = 10
 		it := txn.NewIterator(opts)
-  		defer it.Close()
-  		
+		defer it.Close()
+
 		for it.Rewind(); it.Valid(); it.Next() {
-    			item := it.Item()
-    			k := item.Key()
-    			err := item.Value(func(v []byte) error {
-      				fmt.Printf("\tkey=%s, value=%s\n", k, v)
-     				return nil
-    			})
-    			if err != nil {
-      				return err
-    			}
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				fmt.Printf("\tkey=%s, value=%s\n", k, v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
 		}
-  		return nil
+		return nil
 	})
 	return err
 }
@@ -178,11 +179,11 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 //	if err != nil { panic(err) }
 //
 //	ctx, cancel := context.WithCancel(context.Background())
-//	
+//
 //	db_temp, err := NewBadgerDB(ctx, dir_, log)
 //	if err != nil { fmt.Println(err)}
 //	defer db_temp.Close(ctx, cancel)
-//}	
+//}
 //	// db interface testing
 //	fmt.Println("\tTESTING: Initial iteration")
 //	db_temp.Iterate(ctx)
@@ -197,15 +198,15 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 //	db_temp.Delete(ctx, []byte("temp"))
 //	fmt.Println("\tlast iteration")
 //	db_temp.Iterate(ctx)
-//	
-//	dir := "./db/"	
+//
+//	dir := "./db/"
 //	opts := badger.DefaultOptions
 //	// set SyncWrites to False for performance increase but may cause loss of data
 //	opts.SyncWrites = true
 //	opts.Dir, opts.ValueDir = dir, dir
 //
 //	badgerDB, err := badger.Open(opts)
-//		
+//
 //	defer badgerDB.Close()
 //	bdb := &BadgerDB_Inverted {
 //		db:	badgerDB,
