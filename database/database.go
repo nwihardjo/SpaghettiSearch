@@ -1,14 +1,15 @@
 package database
+
 //package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
 	"log"
 	"time"
-	"encoding/json"
 )
 
 const (
@@ -27,8 +28,8 @@ type (
 	DB_Inverted interface {
 		DB
 		AppendValue(ctx context.Context, key []byte, appendedValue []byte) error
-	}	
-	
+	}
+
 	BadgerDB_Inverted struct {
 		BadgerDB
 	}
@@ -52,10 +53,10 @@ type (
 	}
 )
 
-func DB_init(ctx context.Context, logger *logger.Logger)(inv []DB_Inverted, forw []DB, err error){
+func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "../db_data/"
 	inverted_dir := []string{"invKeyword_body/", "invKeyword_title/"}
-	forward_dir := []string{"Word_wordId/", "WordId_word/", "URL_docId/", "DocId_URL/","Indexes/"}
+	forward_dir := []string{"Word_wordId/", "WordId_word/", "URL_docId/", "DocId_URL/", "Indexes/"}
 
 	for _, v := range inverted_dir {
 		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger)
@@ -65,7 +66,7 @@ func DB_init(ctx context.Context, logger *logger.Logger)(inv []DB_Inverted, forw
 		}
 		inv = append(inv, temp)
 	}
-	
+
 	for _, v := range forward_dir {
 		temp, err := NewBadgerDB(ctx, base_dir+v, logger)
 		if err != nil {
@@ -74,7 +75,7 @@ func DB_init(ctx context.Context, logger *logger.Logger)(inv []DB_Inverted, forw
 		}
 		forw = append(forw, temp)
 	}
-	
+
 	return inv, forw, nil
 }
 
@@ -90,7 +91,7 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 		return nil, err
 	}
 
-	bdb_i := &BadgerDB_Inverted{ BadgerDB{badgerDB, logger}	}
+	bdb_i := &BadgerDB_Inverted{BadgerDB{badgerDB, logger}}
 
 	// run garbage collection in advance
 	go bdb_i.runGC(ctx)
@@ -120,11 +121,11 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger) (DB, er
 }
 
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, appendedValue []byte) error {
-	value, err := bdb_i.Get(ctx, key) 
+	value, err := bdb_i.Get(ctx, key)
 	if err != nil {
 		log.Fatal(err)
 		return err
-	}	
+	}
 
 	var appendedValue_struct InvKeyword_value
 	var tempValues InvKeyword_values
@@ -157,8 +158,7 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, app
 		return err
 	}
 	return nil
-} 
-	
+}
 
 func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err error) {
 	err = bdb.db.View(func(txn *badger.Txn) error {

@@ -1,67 +1,71 @@
 package noschema_schema
+
 //package main
 
-
 import (
-	"fmt"
-	"time"
-	"net/url"
-	"encoding/json"
 	"context"
-        "github.com/apsdehal/go-logger"
-	"strings"
+	"encoding/json"
+	"fmt"
+	"github.com/apsdehal/go-logger"
+	"net/url"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type InvKeyword_value struct {
-	DocId	int32	`json:"DocId"`
-	Pos	[]int32	`json:"Pos"`
+	DocId int32   `json:"DocId"`
+	Pos   []int32 `json:"Pos"`
 }
 
 type InvKeyword_values []InvKeyword_value
 
 type URL_value struct {
-	DocId 		int32		`json:"DocId"`
-	Mod_date	time.Time	`json:"Mod_date"`
-	Page_size	int32		`json:"Page_size"`
-	Children	[]int32		`json:"Childrens"`
-	Parents		[]int32		`json:"Parents"`
-	Words_mapping	map[int32]int32	`json:"Words_mapping"` 
-		//mapping for wordId to wordFrequency
+	DocId         int32           `json:"DocId"`
+	Mod_date      time.Time       `json:"Mod_date"`
+	Page_size     int32           `json:"Page_size"`
+	Children      []int32         `json:"Childrens"`
+	Parents       []int32         `json:"Parents"`
+	Words_mapping map[int32]int32 `json:"Words_mapping"`
+	//mapping for wordId to wordFrequency
 }
-		
+
 //TODO: perform benchmarking between using struct and space in between URL and location
 type DocId_value struct {
-	URL	url.URL	`json:"URL"`
-	FileLoc	string	`json:"FileLoc"`
+	URL     url.URL `json:"URL"`
+	FileLoc string  `json:"FileLoc"`
 }
 
 func (u URL_value) MarshalJSON() ([]byte, error) {
 	basicURL_value := struct {
-		DocId		int32 		`json:"DocId"`	
-		Mod_date	string		`json:"Mod_date"`
-		Page_size	int32		`json:"Page_size"`
-		Children	[]int32		`json:"Childrens"`
-		Parents		[]int32		`json:"Parents"`
-		Words_mapping	map[int32]int32	`json:"Words_mapping"`
-	}{ u.DocId, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping,}
-		
+		DocId         int32           `json:"DocId"`
+		Mod_date      string          `json:"Mod_date"`
+		Page_size     int32           `json:"Page_size"`
+		Children      []int32         `json:"Childrens"`
+		Parents       []int32         `json:"Parents"`
+		Words_mapping map[int32]int32 `json:"Words_mapping"`
+	}{u.DocId, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
+
 	return json.Marshal(basicURL_value)
 }
 
-func (u *URL_value) UnmarshalJSON(j [] byte) error {
+func (u *URL_value) UnmarshalJSON(j []byte) error {
 	var rawStrings map[string]interface{}
-	
+
 	err := json.Unmarshal(j, &rawStrings)
-	if err != nil { return err }
-	
+	if err != nil {
+		return err
+	}
+
 	for k, v := range rawStrings {
 		if strings.ToLower(k) == "docid" {
 			/* ParseInt check whether string can be mapped into int 32-bit
-			   but still return int 64-bit. Further casting is then needed */ 
+			   but still return int 64-bit. Further casting is then needed */
 			u.DocId = int32(v.(float64))
 		} else if strings.ToLower(k) == "mod_date" {
-			if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {return err}
+			if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {
+				return err
+			}
 		} else if strings.ToLower(k) == "page_size" {
 			u.Page_size = int32(v.(float64))
 		} else if strings.ToLower(k) == "children" {
@@ -73,11 +77,11 @@ func (u *URL_value) UnmarshalJSON(j [] byte) error {
 			u.Parents = make([]int32, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
 				u.Parents[k_] = int32(v_.(float64))
-				}
+			}
 		} else if strings.ToLower(k) == "words_mapping" {
-			u.Words_mapping = make(map[int32]int32)	
-			for k_, v_ := range v.(map[string]interface{}){
-				str, _ := strconv.ParseInt(k_, 0, 32)		
+			u.Words_mapping = make(map[int32]int32)
+			for k_, v_ := range v.(map[string]interface{}) {
+				str, _ := strconv.ParseInt(k_, 0, 32)
 				u.Words_mapping[int32(str)] = int32(v_.(float64))
 			}
 		}
@@ -88,31 +92,35 @@ func (u *URL_value) UnmarshalJSON(j [] byte) error {
 
 func (d DocId_value) MarshalJSON() ([]byte, error) {
 	basicDocId_value := struct {
-		URL	string	`json:"URL"`
-		FileLoc	string	`json:"FileLoc"`
-	}{ d.URL.String(), d.FileLoc,}
-	
+		URL     string `json:"URL"`
+		FileLoc string `json:"FileLoc"`
+	}{d.URL.String(), d.FileLoc}
+
 	return json.Marshal(basicDocId_value)
 }
 
 func (d *DocId_value) UnmarshalJSON(j []byte) error {
 	var rawStrings map[string]string
-	
+
 	err := json.Unmarshal(j, &rawStrings)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	for k, v := range rawStrings {
 		if strings.ToLower(k) == "url" {
 			u, err := url.Parse(v)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			d.URL = *u
 		} else if strings.ToLower(k) == "fileloc" {
 			d.FileLoc = v
 		}
 	}
-	
+
 	return nil
-}	
+}
 
 /*
 func main() {
@@ -128,7 +136,7 @@ func main() {
 		Page_size: 1,
 		Children: []int32{1,2,3},
 		Parents: []int32{1,4,6},
-		Words_mapping:Name, 
+		Words_mapping:Name,
 	}
 
 	b, _ := json.Marshal(temp1)
@@ -139,9 +147,9 @@ func main() {
 
 	var temp URL_value
 	json.Unmarshal(b, &temp)
-	
+
 	fmt.Println("aaaaaaaaaaaaaaaa", temp.Words_mapping)
-		
+
 	ctx, cancel := context.WithCancel(context.Background())
 	log, _ := logger.New("test", 1)
 
