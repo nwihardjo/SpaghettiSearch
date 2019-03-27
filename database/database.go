@@ -1,4 +1,5 @@
 package database
+//package main
 
 import (
 	"context"
@@ -7,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger"
 	"log"
 	"time"
+	"encoding/json"
 )
 
 const (
@@ -24,8 +26,7 @@ var (
 type (
 	DB_Inverted interface {
 		DB
-		// TODO: implement AppendValue based on the schema
-		//AppendValue(ctx context.Context, key []byte, appendedValue []byte) error
+		AppendValue(ctx context.Context, key []byte, appendedValue []byte) error
 	}	
 	
 	BadgerDB_Inverted struct {
@@ -41,7 +42,7 @@ type (
 		Has(ctx context.Context, key []byte) (bool, error)
 		Delete(ctx context.Context, key []byte) error
 		Close(ctx context.Context, cancel context.CancelFunc) error
-		// TODO: Iterate functionality to be implemented
+		// TODO: Iterate functionality to be implemented. Only printing atm
 		Iterate(ctx context.Context) error
 	}
 
@@ -51,24 +52,31 @@ type (
 	}
 )
 
-// TODO: to be completed
-func DB_init(ctx context.Context, logger * logger.Logger)([]interface{}, error){
-	/*
-		return: a set of database interface mapped to its function
-		prefix inv* refers to inverted table
-		prefix for* refers to forward table
-	*/
-	invKeyword_body := NewBadgerDB_Inverted(ctx, base_dir+"invKeyword_body/", logger)
-	invKeyword_page := NewBadgerDB_Inverted(ctx, base_dir+"invKeyword_title/", logger)
-	forWord_wordId := NewBadgerDB(ctx, base_dir+"forWord_wordId/", logger)
-	forWordId_word := NewBadgerDB(ctx, base_dir+"forWordId_word/", logger)
-	forURL_docId := NewBadgerDB(ctx, base_dir+"forURL_docId/", logger)
-	forDocId_URL := NewBadgerDB(ctx, base_dir+"forDocId_URL/", logger)
-	forIndexes := NewBadgerDB(ctx, base_dir+"forIndexes/", logger)
+func DB_init(ctx context.Context, logger *logger.Logger)(inv []DB_Inverted, forw []DB, err error){
+	base_dir := "../db_data/"
+	inverted_dir := []string{"invKeyword_body/", "invKeyword_title/"}
+	forward_dir := []string{"Word_wordId/", "WordId_word/", "URL_docId/", "DocId_URL/","Indexes/"}
+
+	for _, v := range inverted_dir {
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger)
+		if err != nil {
+			log.Fatal(err)
+			return nil, nil, err
+		}
+		inv = append(inv, temp)
+	}
+	
+	for _, v := range forward_dir {
+		temp, err := NewBadgerDB(ctx, base_dir+v, logger)
+		if err != nil {
+			log.Fatal(err)
+			return nil, nil, err
+		}
+		forw = append(forw, temp)
+	}
+	
+	return inv, forw, nil
 }
-
-
-
 
 func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger) (DB_Inverted, error) {
 	opts := badger.DefaultOptions
@@ -112,12 +120,44 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger) (DB, er
 }
 
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, appendedValue []byte) error {
-	value, err = bdb_i.Get(ctx, key)
+	value, err := bdb_i.Get(ctx, key) 
 	if err != nil {
 		log.Fatal(err)
 		return err
 	}	
-	
+
+	var appendedValue_struct InvKeyword_value
+	var tempValues InvKeyword_values
+	err = json.Unmarshal(value, &tempValues)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	err = json.Unmarshal(appendedValue, &appendedValue_struct)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	tempValues = append(tempValues, appendedValue_struct)
+	tempVal, err := json.Marshal(tempValues)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	// delete and set the new appended values
+	// TODO: optimise the operation
+	if err = bdb_i.Delete(ctx, key); err != nil {
+		log.Fatal(err)
+		return err
+	}
+	if err = bdb_i.Set(ctx, key, tempVal); err != nil {
+		log.Fatal(err)
+		return err
+	}
+	return nil
+} 
 	
 
 func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err error) {
