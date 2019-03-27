@@ -8,20 +8,28 @@ import (
 	"sync"
 	"strings"
 	"os"
+	"net/url"
 )
 
-func Index(doc []byte, url string, lastModified time.Time, wgIndexer *sync.WaitGroup) {
+var docsDir = "docs/"
+
+func Index(doc []byte, urlString string, lastModified time.Time, wgIndexer *sync.WaitGroup) {
 	defer wgIndexer.Done()
 
 	// fmt.Println("Indexing")
 
 	// Get Last Modified from DB
+	URL, err := url.Parse(urlString)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(URL.String())
 
 	// Save to file
-	if _, err := os.Stat("docs/"); os.IsNotExist(err) {
-		os.Mkdir("docs/", 0755)
+	if _, err := os.Stat(docsDir); os.IsNotExist(err) {
+		os.Mkdir(docsDir, 0755)
 	}
-	err := ioutil.WriteFile("docs/" + strings.ReplaceAll(strings.ReplaceAll(url, "https://", ""), "/", "_"), doc, 0644)
+	err = ioutil.WriteFile(docsDir + strings.ReplaceAll(strings.ReplaceAll(urlString, "https://", ""), "/", "_"), doc, 0644)
 	if err != nil {
 		panic(err)
 	}
