@@ -15,10 +15,10 @@ import (
 
 /*
 =============================== SCHEMA DEFINITION ==========================================
-	
+
 	Schema for inverted table for both body and title page schema:
 		key	: DocId (type: int32)
-		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)	
+		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
 
 	Schema for forward table forw[0]:
 		key	: word (type: string)
@@ -27,7 +27,7 @@ import (
 	Schema for forward table forw[1]:
 		key	: wordId (type: int32)
 		value	: word (type: string)
-	
+
 	Schema for forward table forw[2]:
 		key	: URL (type url.URL)
 		value	: document info including DocId (type: DocInfo)
@@ -43,29 +43,29 @@ import (
 ========================= MARSHAL AND UNMARSHALING =======================================
 
 	Unless specified, all data structure (particularly the primitive ones) can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
-		
+
 		byteArray, err := json.Marshal(any_data_type_unless_specified)
-		
-	
+
+
 	To cast back into the desired data type, use Unmarshal operation
-		
+
 		byteArray, err := tableObject.Get(some_context, key_in_byteArray)
 		var a desired_datatype
 		err = json.Unmarshal(byteArray, &a)
 
-	
+
 	For url.URL data type, use command below to both encode it into array of byte and vice versa
 
 		urlObject, err := url.Parse(url_in_string)
 		byteArray, err := urlObject.MarshalBinary()
-		
+
 		tempUrl := &url.URL
 		err := tempUrl.UnmarshalBinary(byteArray)
 */
 
 // Each item in the a value of inverted table contains the DocId (type: int32) and list of position of the word location in the document
 type InvKeyword_value struct {
-	DocId int32   `json:"DocId"` 
+	DocId int32   `json:"DocId"`
 	Pos   []int32 `json:"Pos"` // list of position of the word occuring in the document DocId
 }
 
@@ -168,7 +168,7 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	b1, _ := json.Marshal(tempdocinfo)
 	fmt.Println("after initialising", string(b1))
 	var tempb1 DocInfo
-	
+
 	json.Unmarshal(b1, &tempb1)
 	fmt.Println("after unmarshaling", tempb1.Words_mapping)
 
@@ -189,7 +189,7 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	temp2 := &url.URL{}
 	temp2.UnmarshalBinary(c)
 	var tempd DocInfo
-	json.Unmarshal(d, &tempd) 
+	json.Unmarshal(d, &tempd)
 	fmt.Println("GET FROM DB", temp2)
 	fmt.Println("GET FROM DB", tempd.Words_mapping)
 }

@@ -57,13 +57,13 @@ type (
 )
 
 /*
-	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)	
+	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)
 
-	refer to `noschema_schema.go` for each table's key and value data types 
+	refer to `noschema_schema.go` for each table's key and value data types
 
 	\params: context, logger
 	\return: list of inverted tables (type: []DB_Inverted), list of forward tables (type: []DB), error
-		inv[0]: inverted table for keywords in body section 	
+		inv[0]: inverted table for keywords in body section
 		inv[1]: inverted table for keywords in title section
 		forw[0]: forward table for word to wordId mapping
 		forw[1]: forward table for wordId to word mapping
