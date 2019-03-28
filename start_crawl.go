@@ -27,6 +27,7 @@ func main() {
 	visited := channels.NewInfiniteChannel()
 	queue := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
+	var wgIndexer sync.WaitGroup
 
 	queue.In() <- startURL
 
@@ -71,7 +72,7 @@ func main() {
 				wg.Add(1)
 
 				/* Crawl the URL using goroutine */
-				go crawler.Crawl(idx, &wg, currentURL, client, queue)
+				go crawler.Crawl(idx, &wg, &wgIndexer, currentURL, client, queue)
 
 			} else {
 				os.Exit(1)
@@ -89,6 +90,7 @@ func main() {
 	/* Close the visited and queue channels */
 	visited.Close()
 	queue.Close()
+	wgIndexer.Wait()
 
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
 }

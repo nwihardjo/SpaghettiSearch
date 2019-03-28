@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"github.com/eapache/channels"
 	"golang.org/x/net/html"
+	"io/ioutil"
+	"../indexer"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+	"bytes"
 )
 
 func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChannel) {
@@ -47,9 +50,8 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 	}
 }
 
-func Crawl(idx int, wg *sync.WaitGroup, currentURL string, client *http.Client, queue *channels.InfiniteChannel) {
+func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup, currentURL string, client *http.Client, queue *channels.InfiniteChannel) {
 	defer wg.Done()
-	defer resp.Body.Close()
 
 	innerStart := time.Now()
 	resp, err := client.Get(currentURL)
@@ -61,19 +63,27 @@ func Crawl(idx int, wg *sync.WaitGroup, currentURL string, client *http.Client, 
 	}
 
 	fmt.Print("Last Modified: ")
-	lm := resp.Header.Get("Last-Modified")
-	if lm == "" {
-		fmt.Println("None")
-	} else {
-		fmt.Println(lm)
+	lms := resp.Header.Get("Last-Modified")
+	lm := time.Now().In(time.UTC)
+	if lms != "" {
+		lm, _ = time.Parse(time.RFC1123, lms)
+		lm = lm.In(time.UTC)
 	}
+	fmt.Println(lm.String())
 	// Send resp, url, and last modified to indexer here
 	// (non-blocking)
-	doc, err := html.Parse(resp.Body)
+	htmlData, er := ioutil.ReadAll(resp.Body)
+	htmlReader := bytes.NewReader(htmlData)
+	if er == nil {
+		wgIndexer.Add(1)
+		go indexer.Index(htmlData, currentURL, lm, wgIndexer)
+	}
+	doc, err := html.Parse(htmlReader)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	EnqueueChildren(doc, currentURL, queue)
+	resp.Body.Close()
 }
