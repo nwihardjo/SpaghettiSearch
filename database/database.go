@@ -25,6 +25,9 @@ var (
 )
 
 type (
+	// In DB_Inverted, Set operation should pass InvKeyword_values as the underlying datatype of the value
+	// AppendValue should pass InvKeyword_value as the underlying datatype of the appended value
+
 	DB_Inverted interface {
 		DB
 		AppendValue(ctx context.Context, key []byte, appendedValue []byte) error
@@ -52,6 +55,22 @@ type (
 		logger *logger.Logger
 	}
 )
+
+/*
+	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)	
+
+	refer to `noschema_schema.go` for each table's key and value data types 
+
+	\params: context, logger
+	\return: list of inverted tables (type: []DB_Inverted), list of forward tables (type: []DB), error
+		inv[0]: inverted table for keywords in body section 	
+		inv[1]: inverted table for keywords in title section
+		forw[0]: forward table for word to wordId mapping
+		forw[1]: forward table for wordId to word mapping
+		forw[2]: forward table for URL to docInfo (including DocId) mapping
+		forw[3]: forward table for DocId to URL mapping
+		forw[4]: forward table for keeping track of index
+*/
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "../db_data/"
@@ -270,31 +289,3 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 	})
 	return err
 }
-
-//func main() {
-//	// testing db instantaneous
-//	dir_ := "../db_data/"
-//	log, err := logger.New("test", 1)
-//	if err != nil { panic(err) }
-//
-//	ctx, cancel := context.WithCancel(context.Background())
-//
-//	db_temp, err := NewBadgerDB(ctx, dir_, log)
-//	if err != nil { fmt.Println(err)}
-//	defer db_temp.Close(ctx, cancel)
-//
-//	// db interface testing
-//	fmt.Println("\tTESTING: Initial iteration")
-//	db_temp.Iterate(ctx)
-//	fmt.Println("\tTESTING: Setting values, and getting them back")
-//	db_temp.Set(ctx, []byte("temp"), []byte("hi"))
-//	value, err := db_temp.Get(ctx, []byte("temp"))
-//	fmt.Printf("\tkey=temp, value=%s\n", value)
-//	fmt.Println("\tTESTING: has functionality")
-//	db_has, err := db_temp.Has(ctx, []byte("answer"))
-//	fmt.Printf("\tdb_temp has anwer keys: %s\n", db_has)
-//	fmt.Println("\tTESTING: deleting keys")
-//	db_temp.Delete(ctx, []byte("temp"))
-//	fmt.Println("\tlast iteration")
-//	db_temp.Iterate(ctx)
-//}
