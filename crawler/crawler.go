@@ -6,6 +6,7 @@ import (
 	"golang.org/x/net/html"
 	"io/ioutil"
 	"../indexer"
+	"../database"
 	"net/http"
 	"os"
 	"strconv"
@@ -50,7 +51,10 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 	}
 }
 
-func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup, currentURL string, client *http.Client, queue *channels.InfiniteChannel) {
+func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
+	currentURL string, client *http.Client, queue *channels.InfiniteChannel,
+	mutex *sync.Mutex, inv []database.DB_Inverted, forw []database.DB) {
+
 	defer wg.Done()
 
 	innerStart := time.Now()
@@ -76,7 +80,7 @@ func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup, currentURL st
 	htmlReader := bytes.NewReader(htmlData)
 	if er == nil {
 		wgIndexer.Add(1)
-		go indexer.Index(htmlData, currentURL, lm, wgIndexer)
+		go indexer.Index(htmlData, currentURL, lm, wgIndexer, mutex, inv, forw)
 	}
 	doc, err := html.Parse(htmlReader)
 	if err != nil {

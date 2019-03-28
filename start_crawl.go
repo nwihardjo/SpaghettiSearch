@@ -2,8 +2,11 @@ package main
 
 import (
 	"./crawler"
+	"./database"
+	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
 	"net/http"
 	"os"
@@ -28,6 +31,18 @@ func main() {
 	queue := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
 	var wgIndexer sync.WaitGroup
+	var mutex sync.Mutex
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	log, _ := logger.New("test", 1)
+	inv, forw, _ := database.DB_init(ctx, log)
+	// TODO: Check nextDocID here
+	for _, bdb_i := range inv {
+		defer bdb_i.Close(ctx, cancel)
+	}
+	for _, bdb := range forw {
+		defer bdb.Close(ctx, cancel)
+	}
 
 	queue.In() <- startURL
 
@@ -72,7 +87,7 @@ func main() {
 				wg.Add(1)
 
 				/* Crawl the URL using goroutine */
-				go crawler.Crawl(idx, &wg, &wgIndexer, currentURL, client, queue)
+				go crawler.Crawl(idx, &wg, &wgIndexer, currentURL, client, queue, &mutex, inv, forw)
 
 			} else {
 				os.Exit(1)
