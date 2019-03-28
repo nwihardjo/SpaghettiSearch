@@ -13,14 +13,68 @@ import (
 	"time"
 )
 
+/*
+=============================== SCHEMA DEFINITION ==========================================
+
+	Schema for inverted table for both body and title page schema:
+		key	: DocId (type: int32)
+		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
+
+	Schema for forward table forw[0]:
+		key	: word (type: string)
+		value	: wordId (type: int32)
+
+	Schema for forward table forw[1]:
+		key	: wordId (type: int32)
+		value	: word (type: string)
+
+	Schema for forward table forw[2]:
+		key	: URL (type url.URL)
+		value	: document info including DocId (type: DocInfo)
+
+	Schema for forward table forw[3]:
+		key:	: DocId (type: int32)
+		value	: URL (type: url.URL)
+
+	Schema for forward table forw[4]:
+		key	: index type (type: string)
+		value	: biggest index value (type: int32)
+
+========================= MARSHAL AND UNMARSHALING =======================================
+
+	Unless specified, all data structure (particularly the primitive ones) can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
+
+		byteArray, err := json.Marshal(any_data_type_unless_specified)
+
+
+	To cast back into the desired data type, use Unmarshal operation
+
+		byteArray, err := tableObject.Get(some_context, key_in_byteArray)
+		var a desired_datatype
+		err = json.Unmarshal(byteArray, &a)
+
+
+	For url.URL data type, use command below to both encode it into array of byte and vice versa
+
+		urlObject, err := url.Parse(url_in_string)
+		byteArray, err := urlObject.MarshalBinary()
+
+		tempUrl := &url.URL
+		err := tempUrl.UnmarshalBinary(byteArray)
+*/
+
+// Each item in the a value of inverted table contains the DocId (type: int32) and list of position of the word location in the document
 type InvKeyword_value struct {
 	DocId int32   `json:"DocId"`
-	Pos   []int32 `json:"Pos"`
+	Pos   []int32 `json:"Pos"` // list of position of the word occuring in the document DocId
 }
 
+// InvKeyword_values contains slice of InvKeyword_value to support append operation
 type InvKeyword_values []InvKeyword_value
 
-type URL_value struct {
+// NOTE: Renamed after URL_value in the previous version
+// DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
+type DocInfo struct {
 	DocId         int32           `json:"DocId"`
 	Mod_date      time.Time       `json:"Mod_date"`
 	Page_size     int32           `json:"Page_size"`
@@ -30,14 +84,8 @@ type URL_value struct {
 	//mapping for wordId to wordFrequency
 }
 
-//TODO: perform benchmarking between using struct and space in between URL and location
-type DocId_value struct {
-	URL     url.URL `json:"URL"`
-	FileLoc string  `json:"FileLoc"`
-}
-
-func (u URL_value) MarshalJSON() ([]byte, error) {
-	basicURL_value := struct {
+func (u DocInfo) MarshalJSON() ([]byte, error) {
+	basicDocInfo := struct {
 		DocId         int32           `json:"DocId"`
 		Mod_date      string          `json:"Mod_date"`
 		Page_size     int32           `json:"Page_size"`
@@ -46,10 +94,10 @@ func (u URL_value) MarshalJSON() ([]byte, error) {
 		Words_mapping map[int32]int32 `json:"Words_mapping"`
 	}{u.DocId, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
 
-	return json.Marshal(basicURL_value)
+	return json.Marshal(basicDocInfo)
 }
 
-func (u *URL_value) UnmarshalJSON(j []byte) error {
+func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	var rawStrings map[string]interface{}
 
 	err := json.Unmarshal(j, &rawStrings)
@@ -90,47 +138,25 @@ func (u *URL_value) UnmarshalJSON(j []byte) error {
 	return nil
 }
 
-func (d DocId_value) MarshalJSON() ([]byte, error) {
-	basicDocId_value := struct {
-		URL     string `json:"URL"`
-		FileLoc string `json:"FileLoc"`
-	}{d.URL.String(), d.FileLoc}
+/*func main() {
+	temp1, _ := url.Parse("https://www.google.com")
+	b, _ := temp1.MarshalBinary()
 
-	return json.Marshal(basicDocId_value)
-}
+	fmt.Println("after initialising", string(b))
 
-func (d *DocId_value) UnmarshalJSON(j []byte) error {
-	var rawStrings map[string]string
+	temp := &url.URL{}
+	_ = temp.UnmarshalBinary(b)
 
-	err := json.Unmarshal(j, &rawStrings)
-	if err != nil {
-		return err
-	}
+	fmt.Println("after unmarshaling", temp)
 
-	for k, v := range rawStrings {
-		if strings.ToLower(k) == "url" {
-			u, err := url.Parse(v)
-			if err != nil {
-				return err
-			}
-			d.URL = *u
-		} else if strings.ToLower(k) == "fileloc" {
-			d.FileLoc = v
-		}
-	}
+	dir := "../db_data/"
 
-	return nil
-}
-
-/*
-func main() {
 	Name := make(map[int32]int32)
 	Name[0] = 0
 	Name[1] = 12
 	Name[2] = 23
 	Name[3] = 40
-
-	temp1 := URL_value{
+	tempdocinfo := DocInfo{
 		DocId: 1,
 		Mod_date: time.Now(),
 		Page_size: 1,
@@ -139,33 +165,35 @@ func main() {
 		Words_mapping:Name,
 	}
 
-	b, _ := json.Marshal(temp1)
+	b1, _ := json.Marshal(tempdocinfo)
+	fmt.Println("after initialising", string(b1))
+	var tempb1 DocInfo
 
-	fmt.Println("after initialising", string(b))
-	fmt.Println("\n Initialising database")
-	dir := "../db_data/"
-
-	var temp URL_value
-	json.Unmarshal(b, &temp)
-
-	fmt.Println("aaaaaaaaaaaaaaaa", temp.Words_mapping)
+	json.Unmarshal(b1, &tempb1)
+	fmt.Println("after unmarshaling", tempb1.Words_mapping)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	log, _ := logger.New("test", 1)
 
 	db, _ := NewBadgerDB(ctx, dir, log)
 	defer db.Close(ctx, cancel)
-	fmt.Println("before addition")
+	fmt.Println("BEFORE ADDITION")
 
 	db.Iterate(ctx)
-	db.Set(ctx, []byte("YES BOI"), b)
+	db.Set(ctx, []byte("1"), b)
+	db.Set(ctx, []byte("2"), b1)
 	fmt.Println("AFTER ADDITION")
 	db.Iterate(ctx)
-	c, _ := db.Get(ctx, []byte("YES BOI"))
-	var a URL_value
-	json.Unmarshal(c, &a)
-	fmt.Println("GET FORM DB", a.Words_mapping)
-/*
+	c, _ := db.Get(ctx, []byte("1"))
+	d, _ := db.Get(ctx, []byte("2"))
+	temp2 := &url.URL{}
+	temp2.UnmarshalBinary(c)
+	var tempd DocInfo
+	json.Unmarshal(d, &tempd)
+	fmt.Println("GET FROM DB", temp2)
+	fmt.Println("GET FROM DB", tempd.Words_mapping)
+}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	log, _ := logger.New("test", 1)
 	fmt.Println("using db_init...")
