@@ -11,6 +11,7 @@ import (
 	"github.com/dgraph-io/badger/options"
 	"log"
 	"time"
+	"os"
 )
 
 const (
@@ -77,11 +78,23 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	base_dir := "../db_data/"
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
 	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": false, "URL_docId/": false, "DocId_URL/": false, "Indexes/": true}
-	//inverted_dir := []string{"invKeyword_body/", "invKeyword_title/"}
-	//forward_dir := []string{"Word_wordId/", "WordId_word/", "URL_docId/", "DocId_URL/", "Indexes/"}
 
-	for k, v := range inverted_dir {
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, v)
+	// create directory if not exist
+	for d, _ := range inverted_dir {
+		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
+			os.Mkdir(base_dir + d, 0755)
+		}
+	}
+
+	for d, _ := range forward_dir {
+		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
+			os.Mkdir(base_dir + d, 0755)
+		}
+	}
+
+	// initiate table object
+	for _, v := range inverted_dir {
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger)
 		if err != nil {
 			log.Fatal(err)
 			return nil, nil, err
