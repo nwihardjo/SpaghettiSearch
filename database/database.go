@@ -10,6 +10,7 @@ import (
 	"github.com/dgraph-io/badger"
 	"log"
 	"time"
+	"os"
 )
 
 const (
@@ -54,9 +55,20 @@ type (
 )
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
-	base_dir := "../db_data/"
+	base_dir := "db_data/"
 	inverted_dir := []string{"invKeyword_body/", "invKeyword_title/"}
 	forward_dir := []string{"Word_wordId/", "WordId_word/", "URL_docId/", "DocId_URL/", "Indexes/"}
+
+	for _, d := range inverted_dir {
+		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
+			os.Mkdir(base_dir + d, 0755)
+		}
+	}
+	for _, d := range forward_dir {
+		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
+			os.Mkdir(base_dir + d, 0755)
+		}
+	}
 
 	for _, v := range inverted_dir {
 		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger)
