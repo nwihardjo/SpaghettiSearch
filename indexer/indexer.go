@@ -15,12 +15,35 @@ import (
 	"strings"
 	// "os"
 	// "io"
-	// "regexp"
+	"regexp"
 	// "net/url"
-	// "github.com/dchest/stemmer/porter2"
+	"github.com/surgebase/porter2"
 )
 
 var docsDir = "docs/"
+var stopWords = make(map[string]int)
+func isStopWord(s string) (isStop bool) {
+	if len(stopWords) == 0 {
+		// create stopWords map if its 0
+		fmt.Println("LOOK", stopWords)
+	}
+	return
+}
+func laundry(s string) (c []string) {
+	// remove all special characters
+	regex := regexp.MustCompile("[^a-zA-Z0-9]")
+	s = regex.ReplaceAllString(s, " ")
+	// remove unnecessary spaces
+	regex = regexp.MustCompile("[^\\s]+")
+	words:= regex.FindAllString(s,-1)
+	// loop through each word and clean them ~laundry time~
+	for _,word := range words {
+		cleaned := strings.TrimSpace(strings.ToLower(word))
+		cleaned = porter2.Stem(cleaned)
+		c = append(c, cleaned)
+	}
+	return
+}
 
 // func Index(doc []byte, urlString string, lastModified time.Time,
 // 	wgIndexer *sync.WaitGroup, mutex *sync.Mutex,
@@ -103,8 +126,11 @@ func main() {
 			if prevToken != "script" && prevToken != "style" && cleaned != "" {
 				words = append(words, cleaned)
 			}
+			break
 		}
 	}
-	fmt.Println(words[4])
+	isStopWord("hi")
+	fmt.Println(words)
+	fmt.Println(laundry(strings.Join(words, " ")))
 	fmt.Println(title)
 }
