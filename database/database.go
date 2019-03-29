@@ -81,7 +81,7 @@ type (
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
-	base_dir := "../db_data/"
+	base_dir := "./db_data/"
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
 	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": false, "URL_docId/": false, "DocId_URL/": false, "Indexes/": true}
 
