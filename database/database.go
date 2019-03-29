@@ -5,10 +5,10 @@ package database
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
+	//"github.com/dgraph-io/badger/pb"
 	"log"
 	"time"
 	"os"
@@ -49,7 +49,9 @@ type (
 		Delete(ctx context.Context, key []byte) error
 		Close(ctx context.Context, cancel context.CancelFunc) error
 		// TODO: Iterate functionality to be implemented. Only printing atm
-		Iterate(ctx context.Context) error
+		// can support prefix search --> think partitioning
+		// order in random due to concurrency
+		//Iterate(ctx context.Context)(map[inteface{}]interface{}, error)
 	}
 
 	BadgerDB struct {
@@ -93,8 +95,8 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	}
 
 	// initiate table object
-	for _, v := range inverted_dir {
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger)
+	for k, v := range inverted_dir {
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, v)
 		if err != nil {
 			log.Fatal(err)
 			return nil, nil, err
@@ -291,7 +293,10 @@ func (bdb *BadgerDB) runGC(ctx context.Context) {
 	}
 }
 
-func (bdb *BadgerDB) Iterate(ctx context.Context) error {
+/*func (bdb *BadgerDB) Iterate(ctx context.Context)(map[interface{}]interface{}, error) {
+	stream := bdb.db.NewStream()	
+
+
 	err := bdb.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchSize = 10
@@ -313,3 +318,4 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 	})
 	return err
 }
+*/

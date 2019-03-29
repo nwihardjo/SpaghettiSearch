@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	//"fmt"
 	//"github.com/apsdehal/go-logger"
-	"net/url"
+	//"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +76,7 @@ type InvKeyword_values []InvKeyword_value
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
 	DocId         uint16           `json:"DocId"`
+	Page_title	[]string	`json:"Page_title"`
 	Mod_date      time.Time       `json:"Mod_date"`
 	Page_size     uint32           `json:"Page_size"`
 	Children      []uint16         `json:"Childrens"`
@@ -87,12 +88,13 @@ type DocInfo struct {
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
 		DocId         uint16           `json:"DocId"`
+		Page_title	[]string	`json:"Page_title"`
 		Mod_date      string          `json:"Mod_date"`
 		Page_size     uint32           `json:"Page_size"`
 		Children      []uint16         `json:"Childrens"`
 		Parents       []uint16         `json:"Parents"`
 		Words_mapping map[uint32]uint32 `json:"Words_mapping"`
-	}{u.DocId, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
+	}{u.DocId, u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
 
 	return json.Marshal(basicDocInfo)
 }
@@ -106,8 +108,15 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	}
 
 	for k, v := range rawStrings {
-		if strings.ToLower(k) == "docid" {
+		if v == nil {
+			continue
+		} else if strings.ToLower(k) == "docid" {
 			u.DocId = uint16(v.(float64))
+		} else if strings.ToLower(k) == "page_title" {
+			u.Page_title = make([]string, len(v.([]interface{})))
+			for k_, v_ := range v.([]interface{}) {
+				u.Page_title[k_] = v_.(string)
+			}
 		} else if strings.ToLower(k) == "mod_date" {
 			if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {
 				return err
@@ -135,32 +144,32 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 
 	return nil
 }
-
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	log, _ := logger.New("test", 1)
-	a, b, _ := DB_init(ctx, log)
-	for _, v := range a {
-		defer v.Close(ctx, cancel)
-	}
-	for _, v := range b{
-		defer v.Close(ctx, cancel)
-	}
-	fmt.Println(url.Parse("https://fb.com"))
-}
 /*
-	temp1, _ := url.Parse("https://www.google.com")
-	b, _ := temp1.MarshalBinary()
+func main() {
+	a := make(map[uint32]uint32)
+	a[1]=10
+	a[2]=20
+	a[3]=30
+	temp := DocInfo{
+//		DocId:	12,
+//		Page_title: []string{"asd","sdf"},
+		Mod_date: time.Now(),
+		Page_size: 32, 	
+		Children: []uint16{1,2,3},
+	//	Parents: []uint16{2,3,5},
+		Words_mapping: a,
+	}
+		 
+	b, _ := json.Marshal(temp)
 
 	fmt.Println("after initialising", string(b))
 
-	temp := &url.URL{}
-	_ = temp.UnmarshalBinary(b)
-
+	var un DocInfo
+	json.Unmarshal(b, &un)
 	fmt.Println("after unmarshaling", temp)
 
 	dir := "../db_data/"
-
+/*
 	Name := make(map[uint32]uint32)
 	Name[0] = 0
 	Name[1] = 12
@@ -191,19 +200,14 @@ func main() {
 
 	db.Delete(ctx, []byte("1"))
 	db.Delete(ctx, []byte("2"))
-	db.Iterate(ctx)
+	//db.Iterate(ctx)
 	db.Set(ctx, []byte("1"), b)
-	db.Set(ctx, []byte("2"), b1)
 	fmt.Println("AFTER ADDITION")
-	db.Iterate(ctx)
+	//db.Iterate(ctx)
 	c, _ := db.Get(ctx, []byte("1"))
-	d, _ := db.Get(ctx, []byte("2"))
-	temp2 := &url.URL{}
-	temp2.UnmarshalBinary(c)
 	var tempd DocInfo
-	json.Unmarshal(d, &tempd)
-	fmt.Println("GET FROM DB", temp2)
-	fmt.Println("GET FROM DB", tempd.Words_mapping)
+	json.Unmarshal(c, &tempd)
+	fmt.Println("GET FROM DB", tempd.Page_title, tempd.Words_mapping, tempd.Page_size)
 }
 /*
 	ctx, cancel := context.WithCancel(context.Background())
