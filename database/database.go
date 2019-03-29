@@ -46,13 +46,23 @@ type (
 	// TODO: add logger debug in each function
 	DB interface {
 		// TODO: integrate prefix search
+
+		// return nil if key not found
 		Get(ctx context.Context, key []byte) (value []byte, err error)
+		
 		Set(ctx context.Context, key []byte, value []byte) error
+		
+		// return nil if key not found
 		Has(ctx context.Context, key []byte) (bool, error)
+		
 		Delete(ctx context.Context, key []byte) error
+	
+		// will call cancel which aborts all process running on the ctx
 		Close(ctx context.Context, cancel context.CancelFunc) error
-		// DropTable will remove all the data in the table
+
+		// DropTable will remove all data in a table (directory)
 		DropTable(ctx context.Context) error
+
 		// data is in random , due to concurrency
 		// ONLY PERFORM THIS ON forw[2] DUE TO DATATYPE. Other datatype will be supported in future release
 		Iterate(ctx context.Context) (map[url.URL]DocInfo, error)
@@ -235,9 +245,14 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 		return nil
 	})
 
-	if err != nil {
+	// will return nil instead of error if key not found, reduce the need to call Has everytime
+	if err == badger.ErrKeyNotFound {
+		return nil, nil
+	} else if err != nil {
+		// other error
 		return nil, err
 	}
+
 	return value, nil
 }
 
