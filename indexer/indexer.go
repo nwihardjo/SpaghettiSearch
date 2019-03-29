@@ -21,12 +21,21 @@ import (
 )
 
 var docsDir = "docs/"
-var stopWords = make(map[string]int)
+var stopWords = make(map[string]bool)
 func isStopWord(s string) (isStop bool) {
+	// create stopWords map if its 0
 	if len(stopWords) == 0 {
-		// create stopWords map if its 0
-		fmt.Println("LOOK", stopWords)
+		// import stopword file
+		content, err := ioutil.ReadFile("./stopwords.txt")
+		if err != nil {
+			panic(err)
+		}
+		wordString := strings.Split(string(content), "\n")
+		for _,word := range wordString {
+			stopWords[word] = true
+		}
 	}
+	isStop = stopWords[s]
 	return
 }
 func laundry(s string) (c []string) {
@@ -40,7 +49,9 @@ func laundry(s string) (c []string) {
 	for _,word := range words {
 		cleaned := strings.TrimSpace(strings.ToLower(word))
 		cleaned = porter2.Stem(cleaned)
-		c = append(c, cleaned)
+		if !isStopWord(cleaned) {
+			c = append(c, cleaned)
+		}
 	}
 	return
 }
@@ -54,8 +65,6 @@ func laundry(s string) (c []string) {
 // 	ctx, _ := context.WithCancel(context.TODO())
 //
 // 	// fmt.Println("Indexing")
-// 	// Set stemmer
-// 	eng := porter2.Stemmer // sample: eng.Stem("delicious")
 // 	// Get Last Modified from DB
 // 	URL, err := url.Parse(urlString)
 //
@@ -76,6 +85,7 @@ func laundry(s string) (c []string) {
 // 		if err != nil {
 // 			panic(err)
 // 		}
+// 		// forward[3].Set(ctx, , URL)
 // 		forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
 // 	mutex.Unlock()
 // 	//END LOCK//
@@ -129,8 +139,6 @@ func main() {
 			break
 		}
 	}
-	isStopWord("hi")
-	fmt.Println(words)
 	fmt.Println(laundry(strings.Join(words, " ")))
-	fmt.Println(title)
+	fmt.Println(laundry(title))
 }
