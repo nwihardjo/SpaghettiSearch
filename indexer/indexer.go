@@ -56,6 +56,16 @@ func laundry(s string) (c []string) {
 	return
 }
 
+func getWordInfo(words []string) (termFreq map[string]int,termPos map[string][]int){
+	termFreq = make(map[string]int)
+	termPos = make(map[string][]int)
+	for pos, word := range words {
+		termPos[word] = append(termPos[word], pos)
+		termFreq[word] = termFreq[word]+1
+	}
+	return
+}
+
 // func Index(doc []byte, urlString string, lastModified time.Time,
 // 	wgIndexer *sync.WaitGroup, mutex *sync.Mutex,
 // 	inverted []database.DB_Inverted, forward []database.DB) {
@@ -139,6 +149,6 @@ func main() {
 			break
 		}
 	}
-	fmt.Println(laundry(strings.Join(words, " ")))
+	fmt.Println(getWordInfo(laundry(strings.Join(words, " "))))
 	fmt.Println(laundry(title))
 }
