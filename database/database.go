@@ -5,9 +5,10 @@ package database
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/options"
+	//"github.com/dgraph-io/badger/pb"
 	"log"
 	"time"
 	"os"
@@ -26,8 +27,8 @@ var (
 )
 
 type (
-	// In DB_Inverted, Set operation should pass InvKeyword_values as the underlying datatype of the value
-	// AppendValue should pass InvKeyword_value as the underlying datatype of the appended value
+	// Set method should be passed InvKeyword_values as the underlying datatype of the value
+	// AppendValue method should be passed InvKeyword_value as the underlying datatype of the appended value
 
 	DB_Inverted interface {
 		DB
@@ -48,7 +49,9 @@ type (
 		Delete(ctx context.Context, key []byte) error
 		Close(ctx context.Context, cancel context.CancelFunc) error
 		// TODO: Iterate functionality to be implemented. Only printing atm
-		Iterate(ctx context.Context) error
+		// can support prefix search --> think partitioning
+		// order in random due to concurrency
+		//Iterate(ctx context.Context)(map[inteface{}]interface{}, error)
 	}
 
 	BadgerDB struct {
@@ -74,23 +77,26 @@ type (
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
-	base_dir := "db_data/"
-	inverted_dir := []string{"invKeyword_body/", "invKeyword_title/"}
-	forward_dir := []string{"Word_wordId/", "WordId_word/", "URL_docId/", "DocId_URL/", "Indexes/"}
+	base_dir := "../db_data/"
+	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
+	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": false, "URL_docId/": false, "DocId_URL/": false, "Indexes/": true}
 
-	for _, d := range inverted_dir {
-		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
-			os.Mkdir(base_dir + d, 0755)
-		}
-	}
-	for _, d := range forward_dir {
+	// create directory if not exist
+	for d, _ := range inverted_dir {
 		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
 			os.Mkdir(base_dir + d, 0755)
 		}
 	}
 
-	for _, v := range inverted_dir {
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger)
+	for d, _ := range forward_dir {
+		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
+			os.Mkdir(base_dir + d, 0755)
+		}
+	}
+
+	// initiate table object
+	for k, v := range inverted_dir {
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, v)
 		if err != nil {
 			log.Fatal(err)
 			return nil, nil, err
@@ -98,8 +104,8 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 		inv = append(inv, temp)
 	}
 
-	for _, v := range forward_dir {
-		temp, err := NewBadgerDB(ctx, base_dir+v, logger)
+	for k, v := range forward_dir {
+		temp, err := NewBadgerDB(ctx, base_dir+k, logger, v)
 		if err != nil {
 			log.Fatal(err)
 			return nil, nil, err
@@ -110,8 +116,12 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	return inv, forw, nil
 }
 
-func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger) (DB_Inverted, error) {
+func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM bool) (DB_Inverted, error) {
 	opts := badger.DefaultOptions
+	if loadIntoRAM {
+		// How should LSM tree be accessed
+		opts.TableLoadingMode = options.LoadToRAM
+	}	
 	// set SyncWrites to False for performance increase but may cause loss of data
 	opts.SyncWrites = true
 	opts.Dir, opts.ValueDir = dir, dir
@@ -129,8 +139,12 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 	return bdb_i, nil
 }
 
-func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger) (DB, error) {
+func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM bool) (DB, error) {
 	opts := badger.DefaultOptions
+	if loadIntoRAM {
+		// How should LSM tree be accessed
+		opts.TableLoadingMode = options.LoadToRAM
+	}	
 	// set SyncWrites to False for performance increase but may cause loss of data
 	opts.SyncWrites = true
 	opts.Dir, opts.ValueDir = dir, dir
@@ -279,7 +293,10 @@ func (bdb *BadgerDB) runGC(ctx context.Context) {
 	}
 }
 
-func (bdb *BadgerDB) Iterate(ctx context.Context) error {
+/*func (bdb *BadgerDB) Iterate(ctx context.Context)(map[interface{}]interface{}, error) {
+	stream := bdb.db.NewStream()	
+
+
 	err := bdb.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchSize = 10
@@ -301,3 +318,4 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) error {
 	})
 	return err
 }
+*/
