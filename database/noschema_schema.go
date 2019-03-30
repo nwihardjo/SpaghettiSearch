@@ -17,7 +17,7 @@ import (
 =============================== SCHEMA DEFINITION ==========================================
 
 	Schema for inverted table for both body and title page schema:
-		key	: DocId (type: uint32)
+		key	: wordId (type: uint32)
 		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
 
 	Schema for forward table forw[0]:
@@ -110,35 +110,44 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	for k, v := range rawStrings {
 		if v == nil {
 			continue
-		} else if strings.ToLower(k) == "docid" {
-			u.DocId = uint16(v.(float64))
-		} else if strings.ToLower(k) == "page_title" {
-			u.Page_title = make([]string, len(v.([]interface{})))
-			for k_, v_ := range v.([]interface{}) {
-				u.Page_title[k_] = v_.(string)
-			}
-		} else if strings.ToLower(k) == "mod_date" {
-			if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {
-				return err
-			}
-		} else if strings.ToLower(k) == "page_size" {
-			u.Page_size = uint32(v.(float64))
-		} else if strings.ToLower(k) == "children" {
-			u.Children = make([]uint16, len(v.([]interface{})))
-			for k_, v_ := range v.([]interface{}) {
-				u.Children[k_] = uint16(v_.(float64))
-			}
-		} else if strings.ToLower(k) == "parents" {
-			u.Parents = make([]uint16, len(v.([]interface{})))
-			for k_, v_ := range v.([]interface{}) {
-				u.Parents[k_] = uint16(v_.(float64))
-			}
-		} else if strings.ToLower(k) == "words_mapping" {
-			u.Words_mapping = make(map[uint32]uint32)
-			for k_, v_ := range v.(map[string]interface{}) {
-				str, _ := strconv.ParseInt(k_, 0, 32)
-				u.Words_mapping[uint32(str)] = uint32(v_.(float64))
-			}
+		}
+		select strings.ToLower(k) {
+			case "docid":
+		 	//else if strings.ToLower(k) == "docid" {
+				u.DocId = uint16(v.(float64))
+			case "page_title":
+			//} else if strings.ToLower(k) == "page_title" {
+				u.Page_title = make([]string, len(v.([]interface{})))
+				for k_, v_ := range v.([]interface{}) {
+					u.Page_title[k_] = v_.(string)
+				}
+			case "mod_date":
+			// } else if strings.ToLower(k) == "mod_date" {
+				if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {
+					return err
+				}
+			case "page_size":
+			//} else if strings.ToLower(k) == "page_size" {
+				u.Page_size = uint32(v.(float64))
+			case "children":
+			//} else if strings.ToLower(k) == "children" {
+				u.Children = make([]uint16, len(v.([]interface{})))
+				for k_, v_ := range v.([]interface{}) {
+					u.Children[k_] = uint16(v_.(float64))
+				}
+			case "parents":
+			//} else if strings.ToLower(k) == "parents" {
+				u.Parents = make([]uint16, len(v.([]interface{})))
+				for k_, v_ := range v.([]interface{}) {
+					u.Parents[k_] = uint16(v_.(float64))
+				}
+			case "words_mapping":
+			//} else if strings.ToLower(k) == "words_mapping" {
+				u.Words_mapping = make(map[uint32]uint32)
+				for k_, v_ := range v.(map[string]interface{}) {
+					str, _ := strconv.ParseInt(k_, 0, 32)
+					u.Words_mapping[uint32(str)] = uint32(v_.(float64))
+				}
 		}
 	}
 
@@ -153,8 +162,8 @@ func main() {
 	c1, _ := url.Parse("http://github.com")
 	key := []*url.URL{a1, b1, c1}
 
-	t := make(map[uint32]uint32)
-	t[1]=10
+	value := []string{"1", "2", "3"}
+/*	t[1]=10
 	t[2]=20
 	t[3]=30
 
@@ -198,15 +207,18 @@ func main() {
 
 	for k, v := range key{
 		temp, _ := v.MarshalBinary()
-		tempv, _ := json.Marshal(value[k])
+		tempv := []byte(string(value[k]))
 		db.Set(ctx, temp, tempv)
 	}
-
+	a, _ := key[0].MarshalBinary()
+	data, _ := db.Get(ctx, a)
+	fmt.Println("get from data", string(data))
+	db.Set(ctx, a, []byte("a"))
+	data, _ = db.Get(ctx, a)
+	fmt.Println("get from data", string(data))
 	fmt.Println("After setting values, iterating through...")
 	temp, _ := db.Iterate(ctx)
 	for k, v := range temp{
 		fmt.Println(k.String(), v.DocId, v.Page_title)
 	}
-
-}
-*/
+}*/

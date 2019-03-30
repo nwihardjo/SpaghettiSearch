@@ -65,7 +65,7 @@ type (
 		Iterate(ctx context.Context) (*collector, error)
 
 		// ONLY USE FOR DEBUGGING PURPOSES
-		Debug_Print(ctx context.Context) error {
+		Debug_Print(ctx context.Context) error 
 	
 	}
 
