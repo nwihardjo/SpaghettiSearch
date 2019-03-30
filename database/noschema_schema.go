@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	//"fmt"
 	//"github.com/apsdehal/go-logger"
-	"net/url"
+	//"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,15 +17,15 @@ import (
 =============================== SCHEMA DEFINITION ==========================================
 
 	Schema for inverted table for both body and title page schema:
-		key	: DocId (type: int32)
+		key	: DocId (type: uint32)
 		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
 
 	Schema for forward table forw[0]:
 		key	: word (type: string)
-		value	: wordId (type: int32)
+		value	: wordId (type: uint32)
 
 	Schema for forward table forw[1]:
-		key	: wordId (type: int32)
+		key	: wordId (type: uint32)
 		value	: word (type: string)
 
 	Schema for forward table forw[2]:
@@ -33,18 +33,18 @@ import (
 		value	: document info including DocId (type: DocInfo)
 
 	Schema for forward table forw[3]:
-		key:	: DocId (type: int32)
+		key:	: DocId (type: uint16)
 		value	: URL (type: url.URL)
 
 	Schema for forward table forw[4]:
 		key	: index type (type: string)
-		value	: biggest index value (type: int32)
+		value	: biggest index value (type: uint32)
 
 ========================= MARSHAL AND UNMARSHALING =======================================
 
-	Unless specified, all data structure (particularly the primitive ones) can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
+	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
 
-		byteArray, err := json.Marshal(any_data_type_unless_specified)
+		byteArray, err := json.Marshal(any_struct_defined_in_this_file)
 
 
 	To cast back into the desired data type, use Unmarshal operation
@@ -59,14 +59,14 @@ import (
 		urlObject, err := url.Parse(url_in_string)
 		byteArray, err := urlObject.MarshalBinary()
 
-		tempUrl := &url.URL
+		tempUrl := &url.URL{}
 		err := tempUrl.UnmarshalBinary(byteArray)
 */
 
-// Each item in the a value of inverted table contains the DocId (type: int32) and list of position of the word location in the document
+// Each item in the a value of inverted table contains the DocId (type: uint16) and list of position of the word location in the document
 type InvKeyword_value struct {
-	DocId int32   `json:"DocId"`
-	Pos   []int32 `json:"Pos"` // list of position of the word occuring in the document DocId
+	DocId uint16   `json:"DocId"`
+	Pos   []uint32 `json:"Pos"` // list of position of the word occuring in the document DocId
 }
 
 // InvKeyword_values contains slice of InvKeyword_value to support append operation
@@ -75,24 +75,26 @@ type InvKeyword_values []InvKeyword_value
 // NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	DocId         int32           `json:"DocId"`
-	Mod_date      time.Time       `json:"Mod_date"`
-	Page_size     int32           `json:"Page_size"`
-	Children      []int32         `json:"Childrens"`
-	Parents       []int32         `json:"Parents"`
-	Words_mapping map[int32]int32 `json:"Words_mapping"`
+	DocId         uint16            `json:"DocId"`
+	Page_title    []string          `json:"Page_title"`
+	Mod_date      time.Time         `json:"Mod_date"`
+	Page_size     uint32            `json:"Page_size"`
+	Children      []uint16          `json:"Childrens"`
+	Parents       []uint16          `json:"Parents"`
+	Words_mapping map[uint32]uint32 `json:"Words_mapping"`
 	//mapping for wordId to wordFrequency
 }
 
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
-		DocId         int32           `json:"DocId"`
-		Mod_date      string          `json:"Mod_date"`
-		Page_size     int32           `json:"Page_size"`
-		Children      []int32         `json:"Childrens"`
-		Parents       []int32         `json:"Parents"`
-		Words_mapping map[int32]int32 `json:"Words_mapping"`
-	}{u.DocId, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
+		DocId         uint16            `json:"DocId"`
+		Page_title    []string          `json:"Page_title"`
+		Mod_date      string            `json:"Mod_date"`
+		Page_size     uint32            `json:"Page_size"`
+		Children      []uint16          `json:"Childrens"`
+		Parents       []uint16          `json:"Parents"`
+		Words_mapping map[uint32]uint32 `json:"Words_mapping"`
+	}{u.DocId, u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
 
 	return json.Marshal(basicDocInfo)
 }
@@ -106,31 +108,36 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	}
 
 	for k, v := range rawStrings {
-		if strings.ToLower(k) == "docid" {
-			/* ParseInt check whether string can be mapped into int 32-bit
-			   but still return int 64-bit. Further casting is then needed */
-			u.DocId = int32(v.(float64))
+		if v == nil {
+			continue
+		} else if strings.ToLower(k) == "docid" {
+			u.DocId = uint16(v.(float64))
+		} else if strings.ToLower(k) == "page_title" {
+			u.Page_title = make([]string, len(v.([]interface{})))
+			for k_, v_ := range v.([]interface{}) {
+				u.Page_title[k_] = v_.(string)
+			}
 		} else if strings.ToLower(k) == "mod_date" {
 			if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {
 				return err
 			}
 		} else if strings.ToLower(k) == "page_size" {
-			u.Page_size = int32(v.(float64))
+			u.Page_size = uint32(v.(float64))
 		} else if strings.ToLower(k) == "children" {
-			u.Children = make([]int32, len(v.([]interface{})))
+			u.Children = make([]uint16, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
-				u.Children[k_] = int32(v_.(float64))
+				u.Children[k_] = uint16(v_.(float64))
 			}
 		} else if strings.ToLower(k) == "parents" {
-			u.Parents = make([]int32, len(v.([]interface{})))
+			u.Parents = make([]uint16, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
-				u.Parents[k_] = int32(v_.(float64))
+				u.Parents[k_] = uint16(v_.(float64))
 			}
 		} else if strings.ToLower(k) == "words_mapping" {
-			u.Words_mapping = make(map[int32]int32)
+			u.Words_mapping = make(map[uint32]uint32)
 			for k_, v_ := range v.(map[string]interface{}) {
 				str, _ := strconv.ParseInt(k_, 0, 32)
-				u.Words_mapping[int32(str)] = int32(v_.(float64))
+				u.Words_mapping[uint32(str)] = uint32(v_.(float64))
 			}
 		}
 	}
@@ -138,71 +145,68 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	return nil
 }
 
-/*func main() {
-	temp1, _ := url.Parse("https://www.google.com")
-	b, _ := temp1.MarshalBinary()
+/*
+func main() {
 
-	fmt.Println("after initialising", string(b))
+	a1, _ := url.Parse("http://www.google.com")
+	b1, _ := url.Parse("http://www.fb.com")
+	c1, _ := url.Parse("http://github.com")
+	key := []*url.URL{a1, b1, c1}
 
-	temp := &url.URL{}
-	_ = temp.UnmarshalBinary(b)
+	t := make(map[uint32]uint32)
+	t[1]=10
+	t[2]=20
+	t[3]=30
 
-	fmt.Println("after unmarshaling", temp)
-
-	dir := "../db_data/"
-
-	Name := make(map[int32]int32)
-	Name[0] = 0
-	Name[1] = 12
-	Name[2] = 23
-	Name[3] = 40
-	tempdocinfo := DocInfo{
+	a := DocInfo {
 		DocId: 1,
+		Page_title: []string{"asd","sdf"},
 		Mod_date: time.Now(),
-		Page_size: 1,
-		Children: []int32{1,2,3},
-		Parents: []int32{1,4,6},
-		Words_mapping:Name,
+		Page_size: 23,
+		Children: []uint16{2, 3, 4},
+		Parents: []uint16{4, 5, 6},
+		Words_mapping: t,
 	}
 
-	b1, _ := json.Marshal(tempdocinfo)
-	fmt.Println("after initialising", string(b1))
-	var tempb1 DocInfo
+	b := DocInfo {
+		DocId: 2,
+		Page_title: []string{"aasd","sadf"},
+		Mod_date: time.Now(),
+		Page_size: 233,
+		Children: []uint16{23, 33, 34},
+		Parents: []uint16{43, 3, 63},
+		Words_mapping: t,
+	}
 
-	json.Unmarshal(b1, &tempb1)
-	fmt.Println("after unmarshaling", tempb1.Words_mapping)
+	c := DocInfo {
+		DocId: 10,
+		Page_title: []string{"aasdsd","asdsdf"},
+		Mod_date: time.Now(),
+		Page_size: 23123,
+		Children: []uint16{21, 23, 4},
+		Parents: []uint16{4, 53, 16},
+		Words_mapping: t,
+	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+
+	value := []DocInfo{a, b, c}
+
+	ctx, _ := context.WithCancel(context.Background())
 	log, _ := logger.New("test", 1)
+	db, _ := NewBadgerDB(ctx, "../db_data/", log, false)
+	db.DropTable(ctx)
 
-	db, _ := NewBadgerDB(ctx, dir, log)
-	defer db.Close(ctx, cancel)
-	fmt.Println("BEFORE ADDITION")
+	for k, v := range key{
+		temp, _ := v.MarshalBinary()
+		tempv, _ := json.Marshal(value[k])
+		db.Set(ctx, temp, tempv)
+	}
 
-	db.Iterate(ctx)
-	db.Set(ctx, []byte("1"), b)
-	db.Set(ctx, []byte("2"), b1)
-	fmt.Println("AFTER ADDITION")
-	db.Iterate(ctx)
-	c, _ := db.Get(ctx, []byte("1"))
-	d, _ := db.Get(ctx, []byte("2"))
-	temp2 := &url.URL{}
-	temp2.UnmarshalBinary(c)
-	var tempd DocInfo
-	json.Unmarshal(d, &tempd)
-	fmt.Println("GET FROM DB", temp2)
-	fmt.Println("GET FROM DB", tempd.Words_mapping)
+	fmt.Println("After setting values, iterating through...")
+	temp, _ := db.Iterate(ctx)
+	for k, v := range temp{
+		fmt.Println(k.String(), v.DocId, v.Page_title)
+	}
+
 }
-
-	ctx, cancel := context.WithCancel(context.Background())
-	log, _ := logger.New("test", 1)
-	fmt.Println("using db_init...")
-	inverted, forward, _ := DB_init(ctx, log)
-	for _, bdb_i := range inverted {
-		defer bdb_i.Close(ctx, cancel)
-	}
-	for _, bdb := range forward {
-		defer bdb.Close(ctx, cancel)
-	}
-
-}*/
+*/
