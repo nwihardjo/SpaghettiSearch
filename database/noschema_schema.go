@@ -59,7 +59,7 @@ import (
 		urlObject, err := url.Parse(url_in_string)
 		byteArray, err := urlObject.MarshalBinary()
 
-		tempUrl := &url.URL
+		tempUrl := &url.URL{}
 		err := tempUrl.UnmarshalBinary(byteArray)
 */
 
@@ -75,24 +75,24 @@ type InvKeyword_values []InvKeyword_value
 // NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	DocId         uint16           `json:"DocId"`
-	Page_title	[]string	`json:"Page_title"`
-	Mod_date      time.Time       `json:"Mod_date"`
-	Page_size     uint32           `json:"Page_size"`
-	Children      []uint16         `json:"Childrens"`
-	Parents       []uint16         `json:"Parents"`
+	DocId         uint16            `json:"DocId"`
+	Page_title    []string          `json:"Page_title"`
+	Mod_date      time.Time         `json:"Mod_date"`
+	Page_size     uint32            `json:"Page_size"`
+	Children      []uint16          `json:"Childrens"`
+	Parents       []uint16          `json:"Parents"`
 	Words_mapping map[uint32]uint32 `json:"Words_mapping"`
 	//mapping for wordId to wordFrequency
 }
 
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
-		DocId         uint16           `json:"DocId"`
-		Page_title	[]string	`json:"Page_title"`
-		Mod_date      string          `json:"Mod_date"`
-		Page_size     uint32           `json:"Page_size"`
-		Children      []uint16         `json:"Childrens"`
-		Parents       []uint16         `json:"Parents"`
+		DocId         uint16            `json:"DocId"`
+		Page_title    []string          `json:"Page_title"`
+		Mod_date      string            `json:"Mod_date"`
+		Page_size     uint32            `json:"Page_size"`
+		Children      []uint16          `json:"Childrens"`
+		Parents       []uint16          `json:"Parents"`
 		Words_mapping map[uint32]uint32 `json:"Words_mapping"`
 	}{u.DocId, u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
 
@@ -144,81 +144,69 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 
 	return nil
 }
+
 /*
 func main() {
-	a := make(map[uint32]uint32)
-	a[1]=10
-	a[2]=20
-	a[3]=30
-	temp := DocInfo{
-//		DocId:	12,
-//		Page_title: []string{"asd","sdf"},
-		Mod_date: time.Now(),
-		Page_size: 32, 	
-		Children: []uint16{1,2,3},
-	//	Parents: []uint16{2,3,5},
-		Words_mapping: a,
-	}
-		 
-	b, _ := json.Marshal(temp)
 
-	fmt.Println("after initialising", string(b))
+	a1, _ := url.Parse("http://www.google.com")
+	b1, _ := url.Parse("http://www.fb.com")
+	c1, _ := url.Parse("http://github.com")
+	key := []*url.URL{a1, b1, c1}
 
-	var un DocInfo
-	json.Unmarshal(b, &un)
-	fmt.Println("after unmarshaling", temp)
+	t := make(map[uint32]uint32)
+	t[1]=10
+	t[2]=20
+	t[3]=30
 
-	dir := "../db_data/"
-/*
-	Name := make(map[uint32]uint32)
-	Name[0] = 0
-	Name[1] = 12
-	Name[2] = 23
-	Name[3] = 40
-	tempdocinfo := DocInfo{
+	a := DocInfo {
 		DocId: 1,
+		Page_title: []string{"asd","sdf"},
 		Mod_date: time.Now(),
-		Page_size: 1,
-		Children: []uint16{1,2,3},
-		Parents: []uint16{1,4,6},
-		Words_mapping:Name,
+		Page_size: 23,
+		Children: []uint16{2, 3, 4},
+		Parents: []uint16{4, 5, 6},
+		Words_mapping: t,
 	}
 
-	b1, _ := json.Marshal(tempdocinfo)
-	fmt.Println("after initialising", string(b1))
-	var tempb1 DocInfo
+	b := DocInfo {
+		DocId: 2,
+		Page_title: []string{"aasd","sadf"},
+		Mod_date: time.Now(),
+		Page_size: 233,
+		Children: []uint16{23, 33, 34},
+		Parents: []uint16{43, 3, 63},
+		Words_mapping: t,
+	}
 
-	json.Unmarshal(b1, &tempb1)
-	fmt.Println("after unmarshaling", tempb1.Words_mapping)
+	c := DocInfo {
+		DocId: 10,
+		Page_title: []string{"aasdsd","asdsdf"},
+		Mod_date: time.Now(),
+		Page_size: 23123,
+		Children: []uint16{21, 23, 4},
+		Parents: []uint16{4, 53, 16},
+		Words_mapping: t,
+	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+
+	value := []DocInfo{a, b, c}
+
+	ctx, _ := context.WithCancel(context.Background())
 	log, _ := logger.New("test", 1)
+	db, _ := NewBadgerDB(ctx, "../db_data/", log, false)
+	db.DropTable(ctx)
 
-	db, _ := NewBadgerDB(ctx, dir, log, false)
-	defer db.Close(ctx, cancel)
-	fmt.Println("BEFORE ADDITION")
+	for k, v := range key{
+		temp, _ := v.MarshalBinary()
+		tempv, _ := json.Marshal(value[k])
+		db.Set(ctx, temp, tempv)
+	}
 
-	db.Delete(ctx, []byte("1"))
-	db.Delete(ctx, []byte("2"))
-	//db.Iterate(ctx)
-	db.Set(ctx, []byte("1"), b)
-	fmt.Println("AFTER ADDITION")
-	//db.Iterate(ctx)
-	c, _ := db.Get(ctx, []byte("1"))
-	var tempd DocInfo
-	json.Unmarshal(c, &tempd)
-	fmt.Println("GET FROM DB", tempd.Page_title, tempd.Words_mapping, tempd.Page_size)
+	fmt.Println("After setting values, iterating through...")
+	temp, _ := db.Iterate(ctx)
+	for k, v := range temp{
+		fmt.Println(k.String(), v.DocId, v.Page_title)
+	}
+
 }
-/*
-	ctx, cancel := context.WithCancel(context.Background())
-	log, _ := logger.New("test", 1)
-	fmt.Println("using db_init...")
-	inverted, forward, _ := DB_init(ctx, log)
-	for _, bdb_i := range inverted {
-		defer bdb_i.Close(ctx, cancel)
-	}
-	for _, bdb := range forward {
-		defer bdb.Close(ctx, cancel)
-	}
-
-}*/
+*/
