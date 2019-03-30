@@ -93,7 +93,7 @@ type (
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
-	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": false, "URL_docId/": false, "DocId_URL/": false, "Indexes/": true}
+	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": false, "DocId_URL/": false, "Indexes/": true}
 
 	// create directory if not exist
 	for d, _ := range inverted_dir {
@@ -136,8 +136,6 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 		// How should LSM tree be accessed
 		opts.TableLoadingMode = options.LoadToRAM
 	}
-	// set SyncWrites to False for performance increase but may cause loss of data
-	opts.SyncWrites = true
 	opts.Dir, opts.ValueDir = dir, dir
 
 	badgerDB, err := badger.Open(opts)
@@ -245,10 +243,7 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 		return nil
 	})
 
-	// will return nil instead of error if key not found, reduce the need to call Has everytime
-	if err == badger.ErrKeyNotFound {
-		return nil, nil
-	} else if err != nil {
+	if err != nil {
 		// other error
 		return nil, err
 	}
