@@ -10,7 +10,6 @@ import (
 	"github.com/dgraph-io/badger/options"
 	bpb "github.com/dgraph-io/badger/pb"
 	"log"
-	"net/url"
 	"os"
 	"time"
 	//"fmt"
@@ -65,7 +64,7 @@ type (
 
 		// data is in random , due to concurrency
 		// ONLY PERFORM THIS ON forw[2] DUE TO DATATYPE. Other datatype will be supported in future release
-		Iterate(ctx context.Context) (map[url.URL]DocInfo, error)
+		Iterate(ctx context.Context) (*collector, error)
 	}
 
 	BadgerDB struct {
@@ -93,7 +92,7 @@ type (
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
-	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": false, "DocId_URL/": false, "Indexes/": true}
+	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": false, "DocId_URL/": true, "Indexes/": true}
 
 	// create directory if not exist
 	for d, _ := range inverted_dir {
@@ -226,7 +225,6 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 		item, err := txn.Get(key)
 
 		if err != nil {
-			log.Fatal(err)
 			return err
 		}
 
@@ -237,7 +235,6 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 		})
 
 		if err != nil {
-			log.Fatal(err)
 			return err
 		}
 		return nil
@@ -320,7 +317,7 @@ func (c *collector) Send(list *bpb.KVList) error {
 	return nil
 }
 
-func (bdb *BadgerDB) Iterate(ctx context.Context) (map[url.URL]DocInfo, error) {
+func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	stream := bdb.db.NewStream()
 	stream.LogPrefix = "Iterating using Stream framework"
 
@@ -332,11 +329,10 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (map[url.URL]DocInfo, error) {
 
 	err := stream.Orchestrate(ctx)
 	if err != nil {
-		log.Fatal(err)
 		return nil, err
 	}
-
-	ret := make(map[url.URL]DocInfo)
+	return c, nil
+	/*ret := make(map[url.URL]DocInfo)
 	for _, kv := range c.kv {
 		tempURL := &url.URL{}
 		if err = tempURL.UnmarshalBinary(kv.Key); err != nil {
@@ -353,4 +349,5 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (map[url.URL]DocInfo, error) {
 		ret[*tempURL] = tempDocInfo
 	}
 	return ret, nil
+	*/
 }
