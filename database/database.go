@@ -5,13 +5,13 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
 	bpb "github.com/dgraph-io/badger/pb"
 	"os"
 	"time"
-	//"fmt"
 )
 
 const (
@@ -47,14 +47,14 @@ type (
 
 		// return nil if key not found
 		Get(ctx context.Context, key []byte) (value []byte, err error)
-		
+
 		Set(ctx context.Context, key []byte, value []byte) error
-		
+
 		// return nil if key not found
 		Has(ctx context.Context, key []byte) (bool, error)
-		
+
 		Delete(ctx context.Context, key []byte) error
-	
+
 		// will call cancel which aborts all process running on the ctx
 		Close(ctx context.Context, cancel context.CancelFunc) error
 
@@ -65,8 +65,7 @@ type (
 		Iterate(ctx context.Context) (*collector, error)
 
 		// ONLY USE FOR DEBUGGING PURPOSES
-		Debug_Print(ctx context.Context) error 
-	
+		Debug_Print(ctx context.Context) error
 	}
 
 	BadgerDB struct {
@@ -94,7 +93,7 @@ type (
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
-	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": false, "DocId_URL/": true, "Indexes/": true}
+	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": true, "DocId_URL/": true, "Indexes/": true}
 
 	// create directory if not exist
 	for d, _ := range inverted_dir {
@@ -301,11 +300,11 @@ func (bdb *BadgerDB) runGC(ctx context.Context) {
 }
 
 type collector struct {
-	kv []*bpb.KV
+	KV []*bpb.KV
 }
 
 func (c *collector) Send(list *bpb.KVList) error {
-	c.kv = append(c.kv, list.Kv...)
+	c.KV = append(c.KV, list.Kv...)
 	return nil
 }
 
@@ -324,24 +323,6 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 		return nil, err
 	}
 	return c, nil
-	/*ret := make(map[url.URL]DocInfo)
-	for _, kv := range c.kv {
-		tempURL := &url.URL{}
-		if err = tempURL.UnmarshalBinary(kv.Key); err != nil {
-			log.Fatal(err)
-			return nil, err
-		}
-
-		var tempDocInfo DocInfo
-		err = json.Unmarshal(kv.Value, &tempDocInfo)
-		if err != nil {
-			log.Fatal(err)
-			return nil, err
-		}
-		ret[*tempURL] = tempDocInfo
-	}
-	return ret, nil
-	*/
 }
 
 func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
