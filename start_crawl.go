@@ -108,4 +108,5 @@ func main() {
 	wgIndexer.Wait()
 
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	inv[0].Debug_Print(ctx)
 }

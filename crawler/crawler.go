@@ -80,7 +80,7 @@ func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
 	htmlReader := bytes.NewReader(htmlData)
 	if er == nil {
 		wgIndexer.Add(1)
-		go indexer.Index(htmlData, currentURL, lm, wgIndexer, mutex, inv, forw)
+		go indexer.Index(htmlData, currentURL, lm, wgIndexer, mutex, inv, forw, nil)
 	}
 	doc, err := html.Parse(htmlReader)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 	"log"
 	"os"
 	"time"
-	//"fmt"
+	"fmt"
 )
 
 const (
@@ -48,14 +48,14 @@ type (
 
 		// return nil if key not found
 		Get(ctx context.Context, key []byte) (value []byte, err error)
-		
+
 		Set(ctx context.Context, key []byte, value []byte) error
-		
+
 		// return nil if key not found
 		Has(ctx context.Context, key []byte) (bool, error)
-		
+
 		Delete(ctx context.Context, key []byte) error
-	
+
 		// will call cancel which aborts all process running on the ctx
 		Close(ctx context.Context, cancel context.CancelFunc) error
 
@@ -65,6 +65,8 @@ type (
 		// data is in random , due to concurrency
 		// ONLY PERFORM THIS ON forw[2] DUE TO DATATYPE. Other datatype will be supported in future release
 		Iterate(ctx context.Context) (*collector, error)
+		// ONLY USE FOR DEBUGGING PURPOSES
+		Debug_Print(ctx context.Context) error
 	}
 
 	BadgerDB struct {
@@ -350,4 +352,27 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	}
 	return ret, nil
 	*/
+}
+
+func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
+	err := bdb.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				fmt.Printf("\tkey=%s, value=%s\n", k, v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
 }
