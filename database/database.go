@@ -9,7 +9,6 @@ import (
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
 	bpb "github.com/dgraph-io/badger/pb"
-	"log"
 	"os"
 	"time"
 	//"fmt"
@@ -63,8 +62,11 @@ type (
 		DropTable(ctx context.Context) error
 
 		// data is in random , due to concurrency
-		// ONLY PERFORM THIS ON forw[2] DUE TO DATATYPE. Other datatype will be supported in future release
 		Iterate(ctx context.Context) (*collector, error)
+
+		// ONLY USE FOR DEBUGGING PURPOSES
+		Debug_Print(ctx context.Context) error {
+	
 	}
 
 	BadgerDB struct {
@@ -97,13 +99,13 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	// create directory if not exist
 	for d, _ := range inverted_dir {
 		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
-			os.Mkdir(base_dir+d, 0755)
+			os.MkdirAll(base_dir+d, 0755)
 		}
 	}
 
 	for d, _ := range forward_dir {
 		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
-			os.Mkdir(base_dir+d, 0755)
+			os.MkdirAll(base_dir+d, 0755)
 		}
 	}
 
@@ -111,7 +113,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	for k, v := range inverted_dir {
 		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, v)
 		if err != nil {
-			log.Fatal(err)
 			return nil, nil, err
 		}
 		inv = append(inv, temp)
@@ -120,7 +121,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	for k, v := range forward_dir {
 		temp, err := NewBadgerDB(ctx, base_dir+k, logger, v)
 		if err != nil {
-			log.Fatal(err)
 			return nil, nil, err
 		}
 		forw = append(forw, temp)
@@ -139,7 +139,6 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
 		return nil, err
 	}
 
@@ -162,7 +161,6 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadInt
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
 		return nil, err
 	}
 
@@ -183,7 +181,6 @@ func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, appendedValue []byte) error {
 	value, err := bdb_i.Get(ctx, key)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 
@@ -191,30 +188,25 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, app
 	var tempValues InvKeyword_values
 	err = json.Unmarshal(value, &tempValues)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 	err = json.Unmarshal(appendedValue, &appendedValue_struct)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 
 	tempValues = append(tempValues, appendedValue_struct)
 	tempVal, err := json.Marshal(tempValues)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 
 	// delete and set the new appended values
 	// TODO: optimise the operation
 	if err = bdb_i.Delete(ctx, key); err != nil {
-		log.Fatal(err)
 		return err
 	}
 	if err = bdb_i.Set(ctx, key, tempVal); err != nil {
-		log.Fatal(err)
 		return err
 	}
 	return nil
@@ -350,4 +342,27 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	}
 	return ret, nil
 	*/
+}
+
+func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
+	err := bdb.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				fmt.Printf("\tkey=%s, value=%s\n", k, v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
 }
