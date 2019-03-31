@@ -55,7 +55,7 @@ func AddParent(currentURL string, parents []string,
 }
 
 func Index(doc []byte, urlString string,
-	lastModified time.Time, mutex *sync.Mutex,
+	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB_Inverted, forward []database.DB,
 	parentURL string, children []string) {
 
