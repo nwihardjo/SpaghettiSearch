@@ -3,6 +3,7 @@ package main
 import (
 	"the-SearchEngine/crawler"
 	"the-SearchEngine/database"
+  "the-SearchEngine/indexer"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -45,11 +46,22 @@ func main() {
 		defer bdb.Close(ctx, cancel)
 	}
 
-	queue.In() <- startURL
+	queue.In() <- []string{"", startURL}
+
+	parentsToBeAdded := make(map[string][]string)
+
+	depth := 0
+	nextDepthSize := 1
+	fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
 
 	for visited.Len() < numOfPages {
-		for idx := 0; queue.Len() > 0 && idx < maxThreadNum && visited.Len() < numOfPages; idx++ {
-			if currentURL, ok := (<-queue.Out()).(string); ok {
+		for idx := 0; queue.Len() > 0 && idx < maxThreadNum && visited.Len() < numOfPages && nextDepthSize > 0; idx++ {
+			if edge, ok := (<-queue.Out()).([]string); ok {
+
+				nextDepthSize -= 1
+
+				parentURL := edge[0]
+				currentURL := edge[1]
 
 				/* Check if currentURL is already visited */
 				flag := false
@@ -78,6 +90,11 @@ func main() {
 				*/
 				if flag {
 					idx--
+					if parentsToBeAdded[currentURL] == nil {
+						parentsToBeAdded[currentURL] = []string{parentURL}
+					} else {
+						parentsToBeAdded[currentURL] = append(parentsToBeAdded[currentURL], parentURL)
+					}
 					continue
 				}
 
@@ -88,7 +105,8 @@ func main() {
 				wg.Add(1)
 
 				/* Crawl the URL using goroutine */
-				go crawler.Crawl(idx, &wg, &wgIndexer, currentURL, client, queue, &mutex, inv, forw)
+				go crawler.Crawl(idx, &wg, parentURL, currentURL,
+					client, queue, &mutex, inv, forw)
 
 			} else {
 				os.Exit(1)
@@ -100,6 +118,27 @@ func main() {
 		wg.Wait()
 		fmt.Println("2life is confusing")
 
+		/*
+			Run function AddParent using goroutine
+			By running this function after each Wait(),
+			it is guaranteed that the original URL with
+			the corresponding doc info must have been
+			stored in the database and that the parents
+			URL are already mapped to some doc id
+		*/
+		for cURL, parents := range parentsToBeAdded {
+			wgIndexer.Add(1)
+			go indexer.AddParent(cURL, parents, forw, &wgIndexer)
+		}
+
+		/* If finished with current depth level, proceed to the next level */
+		if nextDepthSize == 0 {
+
+			depth += 1
+			nextDepthSize += queue.Len()
+			fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
+		}
+
 		if queue.Len() <= 0 {
 			break
 		}
@@ -108,7 +147,9 @@ func main() {
 	/* Close the visited and queue channels */
 	visited.Close()
 	queue.Close()
+
 	fmt.Println("life is confusing")
+	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
 	forw[3].Debug_Print(ctx)

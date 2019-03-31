@@ -25,6 +25,11 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 					continue
 				}
 
+				/* Make sure the URL ends without '/' */
+				if n.Attr[a].Val[len(n.Attr[a].Val)-1] == '/' {
+					n.Attr[a].Val = n.Attr[a].Val[:len(n.Attr[a].Val)-1]
+				}
+
 				/*
 					If the href starts with '/', append this to baseURL
 					Example:
@@ -34,14 +39,14 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				*/
 				if n.Attr[a].Val[0] == '/' {
 					if baseURL[len(baseURL)-1] == '/' {
-						queue.In() <- baseURL[:len(baseURL)-1] + n.Attr[a].Val
+						queue.In() <- []string{baseURL, baseURL[:len(baseURL)-1] + n.Attr[a].Val}
 						children.In() <- baseURL[:len(baseURL)-1] + n.Attr[a].Val
 					} else {
-						queue.In() <- baseURL + n.Attr[a].Val
+						queue.In() <- []string{baseURL, baseURL + n.Attr[a].Val}
 						children.In() <- baseURL + n.Attr[a].Val
 					}
 				} else {
-					queue.In() <- n.Attr[a].Val
+					queue.In() <- []string{baseURL, n.Attr[a].Val}
 					children.In() <- n.Attr[a].Val
 				}
 
@@ -54,9 +59,10 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 	}
 }
 
-func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
-	currentURL string, client *http.Client, queue *channels.InfiniteChannel,
-	mutex *sync.Mutex, inv []database.DB_Inverted, forw []database.DB) {
+func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
+	currentURL string, client *http.Client,
+	queue *channels.InfiniteChannel, mutex *sync.Mutex,
+	inv []database.DB_Inverted, forw []database.DB) {
 
 	defer wg.Done()
 
@@ -107,9 +113,7 @@ func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
 		childs = append(childs, s)
 	}
 
-	wgIndexer.Add(1)
-	// nil should be parent
-	go indexer.Index(htmlData, currentURL, lm, wgIndexer, mutex, inv, forw, nil, childs)
+	indexer.Index(htmlData, currentURL, lm, mutex, inv, forw, parentURL, childs)
 
 	children.Close()
 	resp.Body.Close()
