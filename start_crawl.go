@@ -1,9 +1,9 @@
 package main
 
 import (
-	"./crawler"
-	"./database"
-	"./indexer"
+	"the-SearchEngine/crawler"
+	"the-SearchEngine/database"
+  "the-SearchEngine/indexer"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -13,20 +13,21 @@ import (
 	"os"
 	"sync"
 	"time"
+	"strings"
+  //"strconv"
 )
 
 func main() {
 	fmt.Println("Crawler started...")
 
-	start := time.Now()
-
+	start := time.Now() 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk/"
-	numOfPages := 30
+	numOfPages := 10
 	maxThreadNum := 10
 	visited := channels.NewInfiniteChannel()
 	queue := channels.NewInfiniteChannel()
@@ -147,6 +148,11 @@ func main() {
 
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
-
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	forw[2].Debug_Print(ctx)
+	// word, err:=forw[1].Get(ctx, []byte(strconv.Itoa(9)))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println(string(word), word)
 }
