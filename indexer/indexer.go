@@ -142,7 +142,7 @@ func AddParent(currentURL string, parents []string,
 	if err != nil {
 		panic(err)
 	}
-	var temp DocInfo
+	var temp database.DocInfo
 	err = temp.UnmarshalJSON(tempdocinfoB)
 	if err != nil {
 		panic(err)
@@ -152,7 +152,11 @@ func AddParent(currentURL string, parents []string,
 		if err != nil {
 			panic(err)
 		}
-		temp.Parents = append(temp.Parents, strconv.Atoi(string(docIdPB)))
+		docIdP, err := strconv.Atoi(string(docIdPB))
+		if err != nil {
+			panic(err)
+		}
+		temp.Parents = append(temp.Parents, uint16(docIdP))
 	}
 	newDocInfoBytes, err := temp.MarshalJSON()
 	if err != nil {
@@ -168,7 +172,7 @@ func AddParent(currentURL string, parents []string,
 func Index(doc []byte, urlString string,
 	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB_Inverted, forward []database.DB,
-	parentURL []string, children []string) {
+	parentURL string, children []string) {
 
 	var title string
 	var prevToken string
@@ -311,7 +315,10 @@ func Index(doc []byte, urlString string,
 	if ps == "" {
 		pageSize = len(doc)
 	} else {
-		pageSize = strconv.Atoi(ps)
+		pageSize, err = strconv.Atoi(ps)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	wordMapping := make(map[uint32]uint32)

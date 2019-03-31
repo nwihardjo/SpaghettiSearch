@@ -25,9 +25,12 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 					continue
 				}
 
+				thisURL := ""
 				/* Make sure the URL ends without '/' */
 				if n.Attr[a].Val[len(n.Attr[a].Val)-1] == '/' {
-					n.Attr[a].Val = n.Attr[a].Val[:len(n.Attr[a].Val)-1]
+					thisURL = n.Attr[a].Val[:len(n.Attr[a].Val)-1]
+				} else {
+					thisURL = n.Attr[a].Val
 				}
 
 				/*
@@ -37,17 +40,20 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 						href = "/admin"
 						nextURL = "https://example.com/admin"
 				*/
-				if n.Attr[a].Val[0] == '/' {
+				if len(thisURL) == 0 {
+					continue
+				}
+				if thisURL[0] == '/' {
 					if baseURL[len(baseURL)-1] == '/' {
-						queue.In() <- []string{baseURL, baseURL[:len(baseURL)-1] + n.Attr[a].Val}
-						children.In() <- baseURL[:len(baseURL)-1] + n.Attr[a].Val
+						queue.In() <- []string{baseURL, baseURL[:len(baseURL)-1] + thisURL}
+						children.In() <- baseURL[:len(baseURL)-1] + thisURL
 					} else {
-						queue.In() <- []string{baseURL, baseURL + n.Attr[a].Val}
-						children.In() <- baseURL + n.Attr[a].Val
+						queue.In() <- []string{baseURL, baseURL + thisURL}
+						children.In() <- baseURL + thisURL
 					}
 				} else {
-					queue.In() <- []string{baseURL, n.Attr[a].Val}
-					children.In() <- n.Attr[a].Val
+					queue.In() <- []string{baseURL, thisURL}
+					children.In() <- thisURL
 				}
 
 				break
