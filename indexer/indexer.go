@@ -20,7 +20,6 @@ import (
 "github.com/surgebase/porter2"
 "github.com/dgraph-io/badger"
 "encoding/json"
-// "github.com/apsdehal/go-logger"
 )
 
 var docsDir = "docs/"
@@ -69,28 +68,47 @@ func getWordInfo(words []string) (termFreq map[string]uint32,termPos map[string]
 	return
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID int, nextWordID int, forward []database.DB, inverted database.DB_Inverted){
+func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID int, forward []database.DB, inverted database.DB_Inverted){
 	// set InvKeyword_value
 	invKeyVal := database.InvKeyword_value{uint16(nextDocID), pos[word]}
-	invKeyVals := []database.InvKeyword_value{invKeyVal,}
 	mInvVal, err := json.Marshal(invKeyVal)
 	if err != nil {
 		panic(err)
 	}
+	// set InvKeyword_values
+	invKeyVals := []database.InvKeyword_value{invKeyVal,}
 	mInvVals, err := json.Marshal(invKeyVals)
 	if err != nil {
 		panic(err)
 	}
 	// Get wordID equivalent of current word
 	wordID, err := forward[0].Get(ctx, []byte(word))
-	fmt.Println("org", wordID, word)
+	// fmt.Println(nextWordID)
+	// fmt.Println(word, wordID)
+	// if there is no word to wordID mapping
 	if err == badger.ErrKeyNotFound {
+		// get latest wordID
+			nextWordIDBytes, errNext := forward[4].Get(ctx, []byte("nextWordID"))
+			if errNext == badger.ErrKeyNotFound {
+				// masukkin 0 as nextWordID
+				nextWordIDBytes = []byte(strconv.Itoa(0))
+				forward[4].Set(ctx, []byte("nextWordID"), nextWordIDBytes)
+			} else if errNext != nil {
+				panic(errNext)
+			}
+			nextWordID, err := strconv.Atoi(string(nextWordIDBytes))
+			if err != nil {
+				panic(err)
+			}
+			// use nextWordID
 			wordID = []byte(strconv.Itoa(nextWordID))
-			fmt.Println("aftr", wordID, word)
+			// fmt.Println("new", newWordID)
 			// forw[0] save word -> wordID
 			forward[0].Set(ctx, []byte(word), wordID)
 			// forw[1] save wordID -> word
 			forward[1].Set(ctx, wordID, []byte(word))
+			// update latest wordID
+			forward[4].Set(ctx, []byte("nextWordID"), []byte(strconv.Itoa(nextWordID + 1)))
 	} else if err != nil {
 		panic(err)
 	}
@@ -100,16 +118,12 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	}
 	if hasWordID{
 		// append both values are byte[]
-		normWordID, err := strconv.Atoi(string(wordID))
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(normWordID)
 		inverted.AppendValue(ctx, wordID, mInvVal)
 	} else {
 		// insert the list of inv
 		inverted.Set(ctx, wordID, mInvVals)
 	}
+	return
 }
 
 func Index(doc []byte, urlString string, lastModified time.Time,
@@ -144,27 +158,10 @@ inverted []database.DB_Inverted, forward []database.DB, children []string) {
 	} else if errNext != nil {
 		panic(errNext)
 	}
-	// fmt.Println("passed retrieving nextDocID")
-	nextWordIDBytes, errNext := forward[4].Get(ctx, []byte("nextWordID"))
-	if errNext == badger.ErrKeyNotFound {
-		// masukkin 0 as nextDocID
-		forward[4].Set(ctx, []byte("nextWordID"), []byte(strconv.Itoa(0)))
-		nextWordIDBytes = []byte(strconv.Itoa(0))
-	} else if errNext != nil {
-		panic(errNext)
-	}
-	// fmt.Println("passed retrieving nextWordID")
 	nextDocID, err := strconv.Atoi(string(nextDocIDBytes))
 	if err != nil {
 		panic(err)
 	}
-	nextWordID, err := strconv.Atoi(string(nextWordIDBytes))
-	if err != nil {
-		panic(err)
-	}
-	forward[4].Set(ctx, []byte("nextWordID"), []byte(strconv.Itoa(nextWordID + 1)))
-	forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
-
 	//Tokenize document
 	tokenizer := html.NewTokenizer(bytes.NewReader(doc))
 	for {
@@ -184,7 +181,7 @@ inverted []database.DB_Inverted, forward []database.DB, children []string) {
 		break
 		case html.TextToken:
 			cleaned = strings.TrimSpace(token.Data)
-			if prevToken != "script" && prevToken != "style" && cleaned != "" {
+			if prevToken != "script" && prevToken != "a" && prevToken != "style" && cleaned != ""{
 				words = append(words, cleaned)
 			}
 		break
@@ -193,51 +190,51 @@ inverted []database.DB_Inverted, forward []database.DB, children []string) {
 	// tokenize terms in title and body
 	cleanTitle := laundry(title)
 	cleanBody := laundry(strings.Join(words, " "))
-
 	// get words info
 	_, posTitle := getWordInfo(cleanTitle)
-	_, posBody := getWordInfo(cleanBody)
+	freqBody, posBody := getWordInfo(cleanBody)
 	for _, word := range cleanTitle {
 		// save from title wordID -> [{DocID, Pos}]
-		setInverted(ctx, word, posTitle, nextDocID, nextWordID, forward, inverted[0])
+		setInverted(ctx, word, posTitle, nextDocID, forward, inverted[0])
 	}
 	for _, word := range cleanBody {
 		// save from body wordID-> [{DocID, Pos}]
-		setInverted(ctx, word, posBody, nextDocID, nextWordID, forward, inverted[1])
+		setInverted(ctx, word, posBody, nextDocID, forward, inverted[1])
+		// fmt.Println("HEL",word, nextWordID)
 	}
+	forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
 
 	// forw[2] save URL -> DocInfo
 	// URL to the marshalling stuff
 	// parse title
-	// pageTitle := strings.Fields(title)
-	// pageSize := len(doc)
+	pageTitle := strings.Fields(title)
+	pageSize := len(doc)
 	URLBytes, errMarshal := URL.MarshalBinary()
 	if errMarshal != nil {
 	panic(errMarshal)
 	}
-	// wordMapping := make(map[uint32]uint32)
-	// for word, _ := range freqBody {
-	// 	wordIDBytes, err := forward[0].Get(ctx, []byte(word))
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	fmt.Println("nope", word)
-	// 	wordID, err := strconv.Atoi(string(wordIDBytes))
-	// 	if err != nil {
-	// 		fmt.Println(word)
-	// 		panic(err)
-	// 	}
-	// 	wordMapping[uint32(wordID)] = freqBody[word]
-	// }
-	// fmt.Println("LOOOOOOK")
-	// pageInfo := database.DocInfo{uint16(nextDocID), pageTitle, lastModified, uint32(pageSize), nil, nil, wordMapping}
-	// // marshal pageInfo
-	// mPageInfo, err := pageInfo.MarshalJSON()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// // insert into forward 2
-	// forward[2].Set(ctx, URLBytes, mPageInfo)
+	wordMapping := make(map[uint32]uint32)
+	for word, _ := range freqBody {
+		wordIDBytes, err := forward[0].Get(ctx, []byte(word))
+		if err != nil {
+			panic(err)
+		}
+		wordID, err := strconv.Atoi(string(wordIDBytes))
+		if err != nil {
+			fmt.Println(word)
+			panic(err)
+		}
+		wordMapping[uint32(wordID)] = freqBody[word]
+	}
+	pageInfo := database.DocInfo{uint16(nextDocID), pageTitle, lastModified, uint32(pageSize), nil, nil, wordMapping}
+	// marshal pageInfo
+	mPageInfo, err := pageInfo.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	// insert into forward 2
+	forward[2].Set(ctx, URLBytes, mPageInfo)
+
 	mutex.Unlock()
 	//END LOCK//
 	// type DocInfo struct {
