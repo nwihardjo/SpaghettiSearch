@@ -93,7 +93,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
 	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": true, "DocId_docInfo/": true, "Indexes/": true}
 
-
 	// create directory if not exist
 	for d, _ := range inverted_dir {
 		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {

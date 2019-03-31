@@ -84,7 +84,6 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	// Get wordID equivalent of current word
 	wordID, err := forward[0].Get(ctx, []byte(word))
 	// fmt.Println(nextWordID)
-	// fmt.Println(word, wordID)
 	// if there is no word to wordID mapping
 	if err == badger.ErrKeyNotFound {
 		// get latest wordID
@@ -112,6 +111,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	} else if err != nil {
 		panic(err)
 	}
+	// fmt.Println(word, wordID)
 	hasWordID, err := inverted.Has(ctx, wordID)
 	if err != nil {
 		panic(err)
@@ -125,6 +125,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	}
 	return
 }
+
 
 func AddParent(currentURL string, parents []string,
 	forw []database.DB, wgIndexer *sync.WaitGroup) {
@@ -165,11 +166,12 @@ func AddParent(currentURL string, parents []string,
 }
 
 func Index(doc []byte, urlString string,
-	lastModified time.Time, mutex *sync.Mutex,
+	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB_Inverted, forward []database.DB,
-	parentURL string, children []string) {
+	parentURL []string, children []string) {
+		// defer wgIndexer.Done()
 
-  var title string
+	var title string
 	var prevToken string
 	var words []string
 	var cleaned string
@@ -184,11 +186,13 @@ func Index(doc []byte, urlString string,
 
 	// Get Last Modified from DB
 	URL, err := url.Parse(urlString)
-
 	if err != nil {
 		panic(err)
 	}
-
+	URLBytes, errMarshal := URL.MarshalBinary()
+	if errMarshal != nil {
+		panic(errMarshal)
+	}
 	fmt.Println("Indexing", URL.String())
 
 	//BEGIN LOCK//
@@ -203,6 +207,20 @@ func Index(doc []byte, urlString string,
 		panic(errNext)
 	}
 	nextDocID, err := strconv.Atoi(string(nextDocIDBytes))
+	if err != nil {
+		panic(err)
+	}
+
+	// check if current doc has an ID
+	docIDBytes, err := forward[2].Get(ctx, URLBytes)
+	if err == badger.ErrKeyNotFound {
+		// set docID
+		docIDBytes = nextDocIDBytes
+		// add this doc to forw[2]
+		forward[2].Set(ctx, URLBytes, docIDBytes)
+		forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
+	}
+	docID, err := strconv.Atoi(string(docIDBytes))
 	if err != nil {
 		panic(err)
 	}
@@ -239,24 +257,59 @@ func Index(doc []byte, urlString string,
 	freqBody, posBody := getWordInfo(cleanBody)
 	for _, word := range cleanTitle {
 		// save from title wordID -> [{DocID, Pos}]
-		setInverted(ctx, word, posTitle, nextDocID, forward, inverted[0])
+		setInverted(ctx, word, posTitle, docID, forward, inverted[0])
 	}
 	for _, word := range cleanBody {
 		// save from body wordID-> [{DocID, Pos}]
-		setInverted(ctx, word, posBody, nextDocID, forward, inverted[1])
-		// fmt.Println("HEL",word, nextWordID)
+		setInverted(ctx, word, posBody, docID, forward, inverted[1])
 	}
-	forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
-
+	fmt.Println("HEL")
+	var kids []uint16
+	// get the URL mapping of each child
+	if children != nil {
+		for _,child := range children {
+			// fmt.Println(child)
+			childURL, err := url.Parse(child)
+			if err != nil{
+				panic(err)
+			}
+			mChildURL, errMarshal := childURL.MarshalBinary()
+			if errMarshal != nil {
+				panic(errMarshal)
+			}
+			childIDBytes, err := forward[2].Get(ctx, mChildURL)
+			if err == badger.ErrKeyNotFound {
+				// get the next doc ID
+				nextDocIDBytes, errNext := forward[4].Get(ctx, []byte("nextDocID"))
+				if errNext != nil {
+					panic(errNext)
+				}
+				nextDocID, err := strconv.Atoi(string(nextDocIDBytes))
+				if err != nil {
+					panic(err)
+				}
+				// child is not inserted into URL->DocID
+				forward[2].Set(ctx, mChildURL, nextDocIDBytes)
+				// set childID
+				childIDBytes = nextDocIDBytes
+				// update nextDocID
+				forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
+			}
+			childID, err := strconv.Atoi(string(childIDBytes))
+			if err != nil {
+				panic(err)
+			}
+			// fmt.Println(childID)
+			kids = append(kids, uint16(childID))
+		}
+		fmt.Println(kids)
+	}
 	// forw[2] save URL -> DocInfo
 	// URL to the marshalling stuff
 	// parse title
 	pageTitle := strings.Fields(title)
 	pageSize := len(doc)
-	URLBytes, errMarshal := URL.MarshalBinary()
-	if errMarshal != nil {
-	panic(errMarshal)
-	}
+
 	wordMapping := make(map[uint32]uint32)
 	for word, _ := range freqBody {
 		wordIDBytes, err := forward[0].Get(ctx, []byte(word))
@@ -270,15 +323,18 @@ func Index(doc []byte, urlString string,
 		}
 		wordMapping[uint32(wordID)] = freqBody[word]
 	}
-	pageInfo := database.DocInfo{uint16(nextDocID), pageTitle, lastModified, uint32(pageSize), nil, nil, wordMapping}
+	fmt.Println("final stretch...")
+	pageInfo := database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
 	// marshal pageInfo
 	mPageInfo, err := pageInfo.MarshalJSON()
 	if err != nil {
 		panic(err)
 	}
-	// insert into forward 2
-	forward[2].Set(ctx, URLBytes, mPageInfo)
-
+	// insert into forward 3
+	forward[3].Set(ctx, docIDBytes, mPageInfo)
+	fmt.Println("more final than final")
+	// update forward table for DocID and its corresponding URL
+	// forward[3].Set(ctx, []byte(strconv.Itoa(nextDocID)), URLBytes)
 	mutex.Unlock()
 	//END LOCK//
 	// type DocInfo struct {
@@ -300,65 +356,5 @@ func Index(doc []byte, urlString string,
 	if err != nil {
 	panic(err)
 	}
-	// update forward table for DocID and its corresponding URL
-	forward[3].Set(ctx, []byte(strconv.Itoa(nextDocID)), URLBytes)
+	fmt.Println("i RETURNED")
 }
-
-// func main() {
-// var title string
-// var prevToken string
-// var words []string
-// var cleaned string
-// var wg sync.WaitGroup
-// var wgIndexer sync.WaitGroup
-// var mutex sync.Mutex
-// ctx, cancel := context.WithCancel(context.TODO())
-// log, _ := logger.New("test", 1)
-// inv, forw, _ := database.DB_init(ctx, log)
-// // TODO: Check nextDocID here
-// for _, bdb_i := range inv {
-// 	defer bdb_i.Close(ctx, cancel)
-// }
-// for _, bdb := range forw {
-// 	defer bdb.Close(ctx, cancel)
-// }
-// sample, err := ioutil.ReadFile("./Department of Computer Science and Engineering - HKUST.html")
-// Index(sample, "funURL", time.Now(),
-// 	&wgIndexer, &mutex,
-// 	inv, forw, nil)
-// if err != nil {
-// 	panic(err)
-// }
-// //Tokenize document
-// tokenizer := html.NewTokenizer(bytes.NewReader(sample))
-// for {
-// 	tokenType := tokenizer.Next()
-// 	// end of file or html error
-// 	if tokenType == html.ErrorToken {
-// 		break
-// 	}
-// 	token := tokenizer.Token()
-// 	switch tokenType {
-// 	case html.StartTagToken:
-// 		if token.Data == "title" {
-// 			tokenizer.Next()
-// 			title = strings.TrimSpace(tokenizer.Token().Data)
-// 		}
-// 		if token.Data == "a" {
-// 			tokenizer.Next()
-// 		}
-// 		prevToken = token.Data
-// 		break
-// 	case html.TextToken:
-// 		cleaned = strings.TrimSpace(token.Data)
-// 		if prevToken != "script" && prevToken != "style" && cleaned != "" {
-// 			words = append(words, cleaned)
-// 		}
-// 		break
-// 	}
-// }
-// _, pos := getWordInfo(laundry(strings.Join(words, " ")))
-// try := database.InvKeyword_value{1,pos["facebook"]}
-// fmt.Println(listTry)
-// fmt.Println(laundry(title))
-// }
