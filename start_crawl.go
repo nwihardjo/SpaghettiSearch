@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 	"strings"
+	// "strconv"
+
 )
 
 func main() {
@@ -25,7 +27,7 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk/"
-	numOfPages := 30
+	numOfPages := 10
 	maxThreadNum := 10
 	visited := channels.NewInfiniteChannel()
 	queue := channels.NewInfiniteChannel()
@@ -106,6 +108,11 @@ func main() {
 	visited.Close()
 	queue.Close()
 	wgIndexer.Wait()
-
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	forw[2].Debug_Print(ctx)
+	// word, err:=forw[1].Get(ctx, []byte(strconv.Itoa(9)))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println(string(word), word)
 }

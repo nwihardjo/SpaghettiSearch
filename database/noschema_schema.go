@@ -75,7 +75,7 @@ type InvKeyword_values []InvKeyword_value
 // NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	Url         url.URL            `json:"Url"`
+	Url           url.URL           `json:"Url"`
 	Page_title    []string          `json:"Page_title"`
 	Mod_date      time.Time         `json:"Mod_date"`
 	Page_size     uint32            `json:"Page_size"`
@@ -87,7 +87,7 @@ type DocInfo struct {
 
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
-		Url         string            `json:"Url"`
+		Url           string            `json:"Url"`
 		Page_title    []string          `json:"Page_title"`
 		Mod_date      string            `json:"Mod_date"`
 		Page_size     uint32            `json:"Page_size"`
