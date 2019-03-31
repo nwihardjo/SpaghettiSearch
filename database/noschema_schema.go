@@ -17,7 +17,7 @@ import (
 =============================== SCHEMA DEFINITION ==========================================
 
 	Schema for inverted table for both body and title page schema:
-		key	: DocId (type: uint32)
+		key	: wordId (type: uint32)
 		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
 
 	Schema for forward table forw[0]:
@@ -79,7 +79,7 @@ type DocInfo struct {
 	Page_title    []string          `json:"Page_title"`
 	Mod_date      time.Time         `json:"Mod_date"`
 	Page_size     uint32            `json:"Page_size"`
-	Children      []uint16          `json:"Childrens"`
+	Children      []uint16          `json:"Children"`
 	Parents       []uint16          `json:"Parents"`
 	Words_mapping map[uint32]uint32 `json:"Words_mapping"`
 	//mapping for wordId to wordFrequency
@@ -91,7 +91,7 @@ func (u DocInfo) MarshalJSON() ([]byte, error) {
 		Page_title    []string          `json:"Page_title"`
 		Mod_date      string            `json:"Mod_date"`
 		Page_size     uint32            `json:"Page_size"`
-		Children      []uint16          `json:"Childrens"`
+		Children      []uint16          `json:"Children"`
 		Parents       []uint16          `json:"Parents"`
 		Words_mapping map[uint32]uint32 `json:"Words_mapping"`
 	}{u.DocId, u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
@@ -110,30 +110,32 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	for k, v := range rawStrings {
 		if v == nil {
 			continue
-		} else if strings.ToLower(k) == "docid" {
+		}
+		switch strings.ToLower(k) {
+		case "docid":
 			u.DocId = uint16(v.(float64))
-		} else if strings.ToLower(k) == "page_title" {
+		case "page_title":
 			u.Page_title = make([]string, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
 				u.Page_title[k_] = v_.(string)
 			}
-		} else if strings.ToLower(k) == "mod_date" {
+		case "mod_date":
 			if u.Mod_date, err = time.Parse(time.RFC1123, v.(string)); err != nil {
 				return err
 			}
-		} else if strings.ToLower(k) == "page_size" {
+		case "page_size":
 			u.Page_size = uint32(v.(float64))
-		} else if strings.ToLower(k) == "children" {
+		case "children":
 			u.Children = make([]uint16, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
 				u.Children[k_] = uint16(v_.(float64))
 			}
-		} else if strings.ToLower(k) == "parents" {
+		case "parents":
 			u.Parents = make([]uint16, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
 				u.Parents[k_] = uint16(v_.(float64))
 			}
-		} else if strings.ToLower(k) == "words_mapping" {
+		case "words_mapping":
 			u.Words_mapping = make(map[uint32]uint32)
 			for k_, v_ := range v.(map[string]interface{}) {
 				str, _ := strconv.ParseInt(k_, 0, 32)
@@ -144,69 +146,3 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 
 	return nil
 }
-
-/*
-func main() {
-
-	a1, _ := url.Parse("http://www.google.com")
-	b1, _ := url.Parse("http://www.fb.com")
-	c1, _ := url.Parse("http://github.com")
-	key := []*url.URL{a1, b1, c1}
-
-	t := make(map[uint32]uint32)
-	t[1]=10
-	t[2]=20
-	t[3]=30
-
-	a := DocInfo {
-		DocId: 1,
-		Page_title: []string{"asd","sdf"},
-		Mod_date: time.Now(),
-		Page_size: 23,
-		Children: []uint16{2, 3, 4},
-		Parents: []uint16{4, 5, 6},
-		Words_mapping: t,
-	}
-
-	b := DocInfo {
-		DocId: 2,
-		Page_title: []string{"aasd","sadf"},
-		Mod_date: time.Now(),
-		Page_size: 233,
-		Children: []uint16{23, 33, 34},
-		Parents: []uint16{43, 3, 63},
-		Words_mapping: t,
-	}
-
-	c := DocInfo {
-		DocId: 10,
-		Page_title: []string{"aasdsd","asdsdf"},
-		Mod_date: time.Now(),
-		Page_size: 23123,
-		Children: []uint16{21, 23, 4},
-		Parents: []uint16{4, 53, 16},
-		Words_mapping: t,
-	}
-
-
-	value := []DocInfo{a, b, c}
-
-	ctx, _ := context.WithCancel(context.Background())
-	log, _ := logger.New("test", 1)
-	db, _ := NewBadgerDB(ctx, "../db_data/", log, false)
-	db.DropTable(ctx)
-
-	for k, v := range key{
-		temp, _ := v.MarshalBinary()
-		tempv, _ := json.Marshal(value[k])
-		db.Set(ctx, temp, tempv)
-	}
-
-	fmt.Println("After setting values, iterating through...")
-	temp, _ := db.Iterate(ctx)
-	for k, v := range temp{
-		fmt.Println(k.String(), v.DocId, v.Page_title)
-	}
-
-}
-*/

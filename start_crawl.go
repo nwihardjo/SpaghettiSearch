@@ -12,13 +12,13 @@ import (
 	"os"
 	"sync"
 	"time"
+	"strings"
 )
 
 func main() {
 	fmt.Println("Crawler started...")
 
-	start := time.Now()
-
+	start := time.Now() 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}

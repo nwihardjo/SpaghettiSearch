@@ -1,3 +1,4 @@
 *.swp
+spider_result*
 db_data/
 docs/
