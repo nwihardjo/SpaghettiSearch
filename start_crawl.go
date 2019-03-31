@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./crawler"
-	"./database"
+	"the-SearchEngine/crawler"
+	"the-SearchEngine/database"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -12,15 +12,14 @@ import (
 	"os"
 	"sync"
 	"time"
-	// "strconv"
-
+	"strings"
+  //"strconv"
 )
 
 func main() {
 	fmt.Println("Crawler started...")
 
-	start := time.Now()
-
+	start := time.Now() 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}

@@ -1,7 +1,7 @@
 package indexer
 
 import (
-"../database"
+"the-SearchEngine/database"
 "context"
 "fmt"
 "golang.org/x/net/html"

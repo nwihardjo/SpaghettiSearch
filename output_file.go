@@ -21,11 +21,13 @@ func main() {
 	        b1, _ := url.Parse("http://www.fb.com")
 	        c1, _ := url.Parse("http://github.com")
 	        key := []*url.URL{a1, b1, c1}
+
 	        t := make(map[uint32]uint32)
 		t[1]=10
 	        t[2]=20
 	        t[3]=30
 		tv := []string{"apple", "orange", "juice"}
+
 	        a := database.DocInfo {
 	                DocId: 1,
 	                Page_title: []string{"asd","sdf"},
@@ -35,6 +37,7 @@ func main() {
 	                Parents: []uint16{1},
 	                Words_mapping: t,
 	        }
+
 	        b := database.DocInfo {
 	                DocId: 2,
 	                Page_title: []string{"aasd","sadf"},
@@ -44,6 +47,7 @@ func main() {
 	                Parents: []uint16{1},
 	                Words_mapping: t,
 	        }
+
 	        c := database.DocInfo {
 	                DocId: 3,
 	                Page_title: []string{"aasdsd","asdsdf"},
@@ -53,6 +57,8 @@ func main() {
 	                Parents: []uint16{2, 1},
 	                Words_mapping: t,
 	        }
+
+
 	        value := []database.DocInfo{a, b, c}
 	*/
 
@@ -72,6 +78,7 @@ func main() {
 		forw[1].DropTable(ctx)
 		forw[2].DropTable(ctx)
 		forw[3].DropTable(ctx)
+
 		//populating db, TODO: delete upon pushing
 		for k, v := range key {
 			temp, _ := v.MarshalBinary()
