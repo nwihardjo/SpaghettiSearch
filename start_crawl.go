@@ -1,9 +1,9 @@
 package main
 
 import (
-	"./crawler"
-	"./database"
-	"./indexer"
+	"the-SearchEngine/crawler"
+	"the-SearchEngine/database"
+  "the-SearchEngine/indexer"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -13,20 +13,21 @@ import (
 	"os"
 	"sync"
 	"time"
+	"strings"
+  //"strconv"
 )
 
 func main() {
 	fmt.Println("Crawler started...")
 
-	start := time.Now()
-
+	start := time.Now() 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk/"
-	numOfPages := 30
+	numOfPages := 3
 	maxThreadNum := 10
 	visited := channels.NewInfiniteChannel()
 	queue := channels.NewInfiniteChannel()
@@ -111,9 +112,11 @@ func main() {
 				os.Exit(1)
 			}
 		}
+		fmt.Println("1life is confusing")
 
 		/* Wait for all children to finish */
 		wg.Wait()
+		fmt.Println("2life is confusing")
 
 		/*
 			Run function AddParent using goroutine
@@ -145,8 +148,14 @@ func main() {
 	visited.Close()
 	queue.Close()
 
+	fmt.Println("life is confusing")
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
-
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	forw[3].Debug_Print(ctx)
+	// word, err:=forw[1].Get(ctx, []byte(strconv.Itoa(9)))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println(string(word), word)
 }
