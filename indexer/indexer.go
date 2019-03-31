@@ -127,10 +127,10 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 }
 
 func Index(doc []byte, urlString string,
-	lastModified time.Time,wgIndexer *sync.WaitGroup, mutex *sync.Mutex,
+	lastModified time.Time, pageSize string, mutex *sync.Mutex,
 	inverted []database.DB_Inverted, forward []database.DB,
 	parentURL []string, children []string) {
-		defer wgIndexer.Done()
+		// defer wgIndexer.Done()
 
 	var title string
 	var prevToken string
