@@ -27,7 +27,7 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk/"
-	numOfPages := 10
+	numOfPages := 3
 	maxThreadNum := 10
 	visited := channels.NewInfiniteChannel()
 	queue := channels.NewInfiniteChannel()
@@ -95,9 +95,11 @@ func main() {
 				os.Exit(1)
 			}
 		}
+		fmt.Println("1life is confusing")
 
 		/* Wait for all children to finish */
 		wg.Wait()
+		fmt.Println("2life is confusing")
 
 		if queue.Len() <= 0 {
 			break
@@ -107,6 +109,7 @@ func main() {
 	/* Close the visited and queue channels */
 	visited.Close()
 	queue.Close()
+	fmt.Println("life is confusing")
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
 	forw[3].Debug_Print(ctx)

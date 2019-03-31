@@ -15,50 +15,34 @@ import (
 
 /*
 =============================== SCHEMA DEFINITION ==========================================
-
 	Schema for inverted table for both body and title page schema:
 		key	: wordId (type: uint32)
 		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
-
 	Schema for forward table forw[0]:
 		key	: word (type: string)
 		value	: wordId (type: uint32)
-
 	Schema for forward table forw[1]:
 		key	: wordId (type: uint32)
 		value	: word (type: string)
-
 	Schema for forward table forw[2]:
 		key	: URL (type url.URL)
 		value	: document info including DocId (type: DocInfo)
-
 	Schema for forward table forw[3]:
 		key:	: DocId (type: uint16)
 		value	: URL (type: url.URL)
-
 	Schema for forward table forw[4]:
 		key	: index type (type: string)
 		value	: biggest index value (type: uint32)
-
 ========================= MARSHAL AND UNMARSHALING =======================================
-
 	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
-
 		byteArray, err := json.Marshal(any_struct_defined_in_this_file)
-
-
 	To cast back into the desired data type, use Unmarshal operation
-
 		byteArray, err := tableObject.Get(some_context, key_in_byteArray)
 		var a desired_datatype
 		err = json.Unmarshal(byteArray, &a)
-
-
 	For url.URL data type, use command below to both encode it into array of byte and vice versa
-
 		urlObject, err := url.Parse(url_in_string)
 		byteArray, err := urlObject.MarshalBinary()
-
 		tempUrl := &url.URL{}
 		err := tempUrl.UnmarshalBinary(byteArray)
 */
