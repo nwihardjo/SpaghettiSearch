@@ -76,6 +76,7 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 	}
 
 	fmt.Print("Last Modified: ")
+	ps := resp.Header.Get("Content-Length")
 	lms := resp.Header.Get("Last-Modified")
 	lm := time.Now().In(time.UTC)
 	if lms != "" {
@@ -83,6 +84,12 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 		lm = lm.In(time.UTC)
 	}
 	fmt.Println(lm.String())
+	fmt.Print("File Size: ")
+	if ps == "" {
+		fmt.Println("<unknown>")
+	} else {
+		fmt.Println(ps)
+	}
 
 	htmlData, er := ioutil.ReadAll(resp.Body)
 	if er != nil {
@@ -113,7 +120,7 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 		childs = append(childs, s)
 	}
 
-	indexer.Index(htmlData, currentURL, lm, mutex, inv, forw, parentURL, childs)
+	indexer.Index(htmlData, currentURL, lm, ps, mutex, inv, forw, parentURL, childs)
 
 	children.Close()
 	resp.Body.Close()
