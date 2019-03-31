@@ -129,9 +129,9 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 
 func AddParent(currentURL string, parents []string,
 	forw []database.DB, wgIndexer *sync.WaitGroup) {
-	
-  defer wgIndexer.Done()
-  
+
+	defer wgIndexer.Done()
+
 	ctx, _ := context.WithCancel(context.TODO())
 
 	docIdBytes, err := forw[2].Get(ctx, []byte(currentURL))
@@ -169,13 +169,12 @@ func Index(doc []byte, urlString string,
 	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB_Inverted, forward []database.DB,
 	parentURL []string, children []string) {
-		// defer wgIndexer.Done()
 
 	var title string
 	var prevToken string
 	var words []string
 	var cleaned string
-  
+
 	/* parentURL == "" means nil
 	if parentURL == "" {
 		handle parentURL as nil
@@ -308,7 +307,12 @@ func Index(doc []byte, urlString string,
 	// URL to the marshalling stuff
 	// parse title
 	pageTitle := strings.Fields(title)
-	pageSize := len(doc)
+	var pageSize int
+	if ps == "" {
+		pageSize = len(doc)
+	} else {
+		pageSize = strconv.Atoi(ps)
+	}
 
 	wordMapping := make(map[uint32]uint32)
 	for word, _ := range freqBody {
