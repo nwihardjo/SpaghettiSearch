@@ -76,6 +76,7 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 	}
 
 	fmt.Print("Last Modified: ")
+	ps := resp.Header.Get("Content-Length")
 	lms := resp.Header.Get("Last-Modified")
 	lm := time.Now().In(time.UTC)
 	if lms != "" {
@@ -83,6 +84,12 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 		lm = lm.In(time.UTC)
 	}
 	fmt.Println(lm.String())
+	fmt.Print("File Size: ")
+	if ps == "" {
+		fmt.Println("<unknown>")
+	} else {
+		fmt.Println(ps)
+	}
 
 	htmlData, er := ioutil.ReadAll(resp.Body)
 	if er != nil {
@@ -104,16 +111,21 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 	// Send resp, url, and last modified to indexer here
 	// (non-blocking)
 
-	var childs []string
-	for i := 0; i < children.Len(); i++ {
+	childs := make(map[string]int)
+	childrenLen := children.Len()
+	for i := 0; i < childrenLen; i++ {
 		s, ok := (<-children.Out()).(string)
 		if !ok {
 			break
 		}
-		childs = append(childs, s)
+		childs[s] += 1
+	}
+	var childsArr []string
+	for k, _ := range childs {
+		childsArr = append(childsArr, k)
 	}
 
-	indexer.Index(htmlData, currentURL, lm, mutex, inv, forw, parentURL, childs)
+	indexer.Index(htmlData, currentURL, lm, ps, mutex, inv, forw, parentURL, childsArr)
 
 	children.Close()
 	resp.Body.Close()
