@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	//"fmt"
 	//"github.com/apsdehal/go-logger"
-	//"net/url"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -75,7 +75,7 @@ type InvKeyword_values []InvKeyword_value
 // NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	DocId         uint16            `json:"DocId"`
+	Url           url.URL           `json:"Url"`
 	Page_title    []string          `json:"Page_title"`
 	Mod_date      time.Time         `json:"Mod_date"`
 	Page_size     uint32            `json:"Page_size"`
@@ -87,14 +87,14 @@ type DocInfo struct {
 
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
-		DocId         uint16            `json:"DocId"`
+		Url           string            `json:"Url"`
 		Page_title    []string          `json:"Page_title"`
 		Mod_date      string            `json:"Mod_date"`
 		Page_size     uint32            `json:"Page_size"`
 		Children      []uint16          `json:"Children"`
 		Parents       []uint16          `json:"Parents"`
 		Words_mapping map[uint32]uint32 `json:"Words_mapping"`
-	}{u.DocId, u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
+	}{u.Url.String(), u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size, u.Children, u.Parents, u.Words_mapping}
 
 	return json.Marshal(basicDocInfo)
 }
@@ -112,8 +112,12 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 			continue
 		}
 		switch strings.ToLower(k) {
-		case "docid":
-			u.DocId = uint16(v.(float64))
+		case "url":
+			temp, err := url.Parse(v.(string))
+			if err != nil {
+				return err
+			}
+			u.Url = *temp
 		case "page_title":
 			u.Page_title = make([]string, len(v.([]interface{})))
 			for k_, v_ := range v.([]interface{}) {
