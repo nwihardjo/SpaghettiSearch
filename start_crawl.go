@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./crawler"
-	"./database"
+	"the-SearchEngine/crawler"
+	"the-SearchEngine/database"
 	"context"
 	"crypto/tls"
 	"fmt"

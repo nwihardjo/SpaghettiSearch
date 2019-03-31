@@ -1,7 +1,7 @@
 package main
 
 import (
-	"./database"
+	"the-SearchEngine/database"
 	"context"
 	"encoding/json"
 	"fmt"
