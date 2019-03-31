@@ -291,8 +291,22 @@ func Index(doc []byte, urlString string,
 				if err != nil {
 					panic(err)
 				}
+				docInfoC := database.DocInfo{
+					*childURL,
+					nil,
+					time.Now(),
+					0,
+					nil,
+					[]uint16{uint16(nextDocID),},
+					nil,
+				}
+				docInfoBytes, err := json.Marshal(docInfoC)
+				if err != nil {
+					panic(err)
+				}
 				// child is not inserted into URL->DocID
 				forward[2].Set(ctx, mChildURL, nextDocIDBytes)
+				forward[3].Set(ctx, nextDocIDBytes, docInfoBytes)
 				// set childID
 				childIDBytes = nextDocIDBytes
 				// update nextDocID
