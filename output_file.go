@@ -125,6 +125,7 @@ func main() {
 		for wordId, freq := range v.Words_mapping {
 			word, err := forw[1].Get(ctx, []byte(strconv.Itoa(int(wordId))))
 			if err != nil {
+        fmt.Println(wordId, freq)
 				panic(err)
 			}
 			wordFreq = append(wordFreq, string(word)+" "+strconv.Itoa(int(freq)))

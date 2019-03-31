@@ -83,15 +83,15 @@ type (
 		inv[1]: inverted table for keywords in title section
 		forw[0]: forward table for word to wordId mapping
 		forw[1]: forward table for wordId to word mapping
-		forw[2]: forward table for URL to docInfo (including DocId) mapping
-		forw[3]: forward table for DocId to URL mapping
+		forw[2]: forward table for URL to DocId mapping
+		forw[3]: forward table for DocId to DocInfo mapping
 		forw[4]: forward table for keeping track of index
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
 	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
-	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": true, "DocId_URL/": true, "Indexes/": true}
+	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": true, "DocId_docInfo/": true, "Indexes/": true}
 
 	// create directory if not exist
 	for d, _ := range inverted_dir {
