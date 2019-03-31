@@ -126,16 +126,64 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	return
 }
 
+
+func AddParent(currentURL string, parents []string,
+	forw []database.DB, wgIndexer *sync.WaitGroup) {
+
+	defer wgIndexer.Done()
+
+	ctx, _ := context.WithCancel(context.TODO())
+
+	docIdBytes, err := forw[2].Get(ctx, []byte(currentURL))
+	if err != nil {
+		panic(err)
+	}
+	tempdocinfoB, err := forw[3].Get(ctx, docIdBytes)
+	if err != nil {
+		panic(err)
+	}
+	var temp database.DocInfo
+	err = temp.UnmarshalJSON(tempdocinfoB)
+	if err != nil {
+		panic(err)
+	}
+	for _, pURL := range parents {
+		docIdPB, err := forw[2].Get(ctx, []byte(pURL))
+		if err != nil {
+			panic(err)
+		}
+		docIdP, err := strconv.Atoi(string(docIdPB))
+		if err != nil {
+			panic(err)
+		}
+		temp.Parents = append(temp.Parents, uint16(docIdP))
+	}
+	newDocInfoBytes, err := temp.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	err = forw[3].Set(ctx, docIdBytes, newDocInfoBytes)
+	if err != nil {
+		panic(err)
+	}
+
+}
+
 func Index(doc []byte, urlString string,
-	lastModified time.Time, pageSize string, mutex *sync.Mutex,
+	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB_Inverted, forward []database.DB,
-	parentURL []string, children []string) {
-		// defer wgIndexer.Done()
+	parentURL string, children []string) {
 
 	var title string
 	var prevToken string
 	var words []string
 	var cleaned string
+
+	/* parentURL == "" means nil
+	if parentURL == "" {
+		handle parentURL as nil
+	}
+	*/
 
 	ctx, _ := context.WithCancel(context.TODO())
 
@@ -263,7 +311,15 @@ func Index(doc []byte, urlString string,
 	// URL to the marshalling stuff
 	// parse title
 	pageTitle := strings.Fields(title)
-	pageSize := len(doc)
+	var pageSize int
+	if ps == "" {
+		pageSize = len(doc)
+	} else {
+		pageSize, err = strconv.Atoi(ps)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	wordMapping := make(map[uint32]uint32)
 	for word, _ := range freqBody {

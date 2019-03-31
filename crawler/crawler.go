@@ -25,6 +25,14 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 					continue
 				}
 
+				thisURL := ""
+				/* Make sure the URL ends without '/' */
+				if n.Attr[a].Val[len(n.Attr[a].Val)-1] == '/' {
+					thisURL = n.Attr[a].Val[:len(n.Attr[a].Val)-1]
+				} else {
+					thisURL = n.Attr[a].Val
+				}
+
 				/*
 					If the href starts with '/', append this to baseURL
 					Example:
@@ -32,17 +40,20 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 						href = "/admin"
 						nextURL = "https://example.com/admin"
 				*/
-				if n.Attr[a].Val[0] == '/' {
+				if len(thisURL) == 0 {
+					continue
+				}
+				if thisURL[0] == '/' {
 					if baseURL[len(baseURL)-1] == '/' {
-						queue.In() <- baseURL[:len(baseURL)-1] + n.Attr[a].Val
-						children.In() <- baseURL[:len(baseURL)-1] + n.Attr[a].Val
+						queue.In() <- []string{baseURL, baseURL[:len(baseURL)-1] + thisURL}
+						children.In() <- baseURL[:len(baseURL)-1] + thisURL
 					} else {
-						queue.In() <- baseURL + n.Attr[a].Val
-						children.In() <- baseURL + n.Attr[a].Val
+						queue.In() <- []string{baseURL, baseURL + thisURL}
+						children.In() <- baseURL + thisURL
 					}
 				} else {
-					queue.In() <- n.Attr[a].Val
-					children.In() <- n.Attr[a].Val
+					queue.In() <- []string{baseURL, thisURL}
+					children.In() <- thisURL
 				}
 
 				break
@@ -54,9 +65,10 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 	}
 }
 
-func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
-	currentURL string, client *http.Client, queue *channels.InfiniteChannel,
-	mutex *sync.Mutex, inv []database.DB_Inverted, forw []database.DB) {
+func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
+	currentURL string, client *http.Client,
+	queue *channels.InfiniteChannel, mutex *sync.Mutex,
+	inv []database.DB_Inverted, forw []database.DB) {
 
 	defer wg.Done()
 
@@ -70,6 +82,7 @@ func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
 	}
 
 	fmt.Print("Last Modified: ")
+	ps := resp.Header.Get("Content-Length")
 	lms := resp.Header.Get("Last-Modified")
 	lm := time.Now().In(time.UTC)
 	if lms != "" {
@@ -77,6 +90,12 @@ func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
 		lm = lm.In(time.UTC)
 	}
 	fmt.Println(lm.String())
+	fmt.Print("File Size: ")
+	if ps == "" {
+		fmt.Println("<unknown>")
+	} else {
+		fmt.Println(ps)
+	}
 
 	htmlData, er := ioutil.ReadAll(resp.Body)
 	if er != nil {
@@ -98,18 +117,21 @@ func Crawl(idx int, wg *sync.WaitGroup, wgIndexer *sync.WaitGroup,
 	// Send resp, url, and last modified to indexer here
 	// (non-blocking)
 
-	var childs []string
-	for i := 0; i < children.Len(); i++ {
+	childs := make(map[string]int)
+	childrenLen := children.Len()
+	for i := 0; i < childrenLen; i++ {
 		s, ok := (<-children.Out()).(string)
 		if !ok {
 			break
 		}
-		childs = append(childs, s)
+		childs[s] += 1
+	}
+	var childsArr []string
+	for k, _ := range childs {
+		childsArr = append(childsArr, k)
 	}
 
-	wgIndexer.Add(1)
-	// nil should be parent
-	go indexer.Index(htmlData, currentURL, lm, wgIndexer, mutex, inv, forw, nil, childs)
+	indexer.Index(htmlData, currentURL, lm, ps, mutex, inv, forw, parentURL, childsArr)
 
 	children.Close()
 	resp.Body.Close()
