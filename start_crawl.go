@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
-	"github.com/dgraph-io/badger"
 	"net/http"
 	"os"
 	"sync"
@@ -29,8 +28,8 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk/"
-	numOfPages := 3
-	maxThreadNum := 10
+	numOfPages := 30
+	maxThreadNum := 50
 	visited := channels.NewInfiniteChannel()
 	queue := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
