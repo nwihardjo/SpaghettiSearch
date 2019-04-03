@@ -30,7 +30,7 @@ func main() {
 	startURL := "https://www.cse.ust.hk"
 	numOfPages := 30
 	maxThreadNum := 50
-	visited := channels.NewInfiniteChannel()
+	visited := make(map[string]bool)
 	queue := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
 	var wgIndexer sync.WaitGroup
@@ -54,8 +54,8 @@ func main() {
 	nextDepthSize := 1
 	fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
 
-	for visited.Len() < numOfPages {
-		for idx := 0; queue.Len() > 0 && idx < maxThreadNum && visited.Len() < numOfPages && nextDepthSize > 0; idx++ {
+	for len(visited) < numOfPages {
+		for idx := 0; queue.Len() > 0 && idx < maxThreadNum && len(visited) < numOfPages && nextDepthSize > 0; idx++ {
 			if edge, ok := (<-queue.Out()).([]string); ok {
 
 				nextDepthSize -= 1
@@ -64,31 +64,11 @@ func main() {
 				currentURL := edge[1]
 
 				/* Check if currentURL is already visited */
-				flag := false
-				var temp []string // Temporary variable for storing the visited buffer
-				for i := 0; i < visited.Len(); i++ {
-					v, ok2 := (<-visited.Out()).(string)
-					if !ok2 {
-						break
-					}
-
-					temp = append(temp, v)
-
-					if v == currentURL { // If currentURL in visited, flag = true
-						flag = true
-					}
-				}
-
-				/* Store back the visited URLs from temp to visited buffer */
-				for _, t := range temp {
-					visited.In() <- t
-				}
-
-				/*
-					If currentURL is already visited (handle cycle),
-					do not visit this URL and do not increase the idx
-				*/
-				if flag {
+				if visited[currentURL] {
+					/*
+						If currentURL is already visited (handle cycle),
+						do not visit this URL and do not increase the idx
+					*/
 					idx--
 					if parentsToBeAdded[currentURL] == nil {
 						parentsToBeAdded[currentURL] = []string{parentURL}
@@ -99,7 +79,7 @@ func main() {
 				}
 
 				/* Put currentURL to visited buffer */
-				visited.In() <- currentURL
+				visited[currentURL] = true
 
 				/* Add below goroutine (child) to the list of children to be waited */
 				wg.Add(1)
@@ -142,8 +122,7 @@ func main() {
 		}
 	}
 
-	/* Close the visited and queue channels */
-	visited.Close()
+	/* Close the queue channel */
 	queue.Close()
 
 	/* Wait for all indexers to finish */
