@@ -266,7 +266,6 @@ func Index(doc []byte, urlString string,
 		// save from body wordID-> [{DocID, Pos}]
 		setInverted(ctx, word, posBody, docID, forward, inverted[1])
 	}
-	fmt.Println("HEL")
 	var kids []uint16
 	// get the URL mapping of each child
 	if children != nil {
@@ -319,7 +318,6 @@ func Index(doc []byte, urlString string,
 			// fmt.Println(childID)
 			kids = append(kids, uint16(childID))
 		}
-		fmt.Println(kids)
 	}
 	// forw[2] save URL -> DocInfo
 	// URL to the marshalling stuff
@@ -343,12 +341,10 @@ func Index(doc []byte, urlString string,
 		}
 		wordID, err := strconv.Atoi(string(wordIDBytes))
 		if err != nil {
-			fmt.Println(word)
 			panic(err)
 		}
 		wordMapping[uint32(wordID)] = freqBody[word]
 	}
-	fmt.Println("final stretch...")
 	pageInfo := database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
 	// marshal pageInfo
 	mPageInfo, err := pageInfo.MarshalJSON()
@@ -357,7 +353,6 @@ func Index(doc []byte, urlString string,
 	}
 	// insert into forward 3
 	forward[3].Set(ctx, docIDBytes, mPageInfo)
-	fmt.Println("more final than final")
 	// update forward table for DocID and its corresponding URL
 	// forward[3].Set(ctx, []byte(strconv.Itoa(nextDocID)), URLBytes)
 	mutex.Unlock()
@@ -381,5 +376,4 @@ func Index(doc []byte, urlString string,
 	if err != nil {
 	panic(err)
 	}
-	fmt.Println("i RETURNED")
 }

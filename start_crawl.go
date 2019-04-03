@@ -21,7 +21,7 @@ import (
 func main() {
 	fmt.Println("Crawler started...")
 
-	start := time.Now() 
+	start := time.Now()
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -113,11 +113,9 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		fmt.Println("1life is confusing")
 
 		/* Wait for all children to finish */
 		wg.Wait()
-		fmt.Println("2life is confusing")
 
 		/*
 			Run function AddParent using goroutine
@@ -149,13 +147,10 @@ func main() {
 	visited.Close()
 	queue.Close()
 
-	fmt.Println("life is confusing")
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
-	forw[3].Debug_Print(ctx)
-	
-	//Output into a file	
+	//Output into a file
 	f, err := os.Create("./spider_result.txt")
 	if err != nil {
 		panic(err)
@@ -172,7 +167,7 @@ func main() {
 		var tempDocInfo database.DocInfo
 		err = json.Unmarshal(kv.Value, &tempDocInfo)
 		if err != nil {
-			panic(err)	
+			panic(err)
 		}
 		// Remove unscraped data, present for the sake of printing out child url
 		if tempDocInfo.Page_size == 0 {
@@ -194,7 +189,7 @@ func main() {
 			}
 			wordFreq = append(wordFreq, string(word)+" "+strconv.Itoa(int(freq)))
 		}
-		
+
 		// Iterate through the children of the URL
 		childUrl := []string{}
 		for _, child := range v.Children{
@@ -209,12 +204,12 @@ func main() {
 			}
 			childUrl = append(childUrl, "Child "+tempData.Url.String())
 		}
-		
+
 		// Append all info for a document into a formatted string to be written
 		output := []string{strings.Join(v.Page_title, " "), v.Url.String(), strings.Join(lineThree, ", "), strings.Join(wordFreq, "; "), strings.Join(childUrl, " \n"), outputSeparator}
 		_, err := f.WriteString(strings.Join(output, " \n"))
 		if err != nil {
-			panic(err)	
+			panic(err)
 		}
 		f.Sync()
 	}
