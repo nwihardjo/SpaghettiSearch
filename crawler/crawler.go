@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChannel, children *channels.InfiniteChannel) {
+func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChannel, children map[string]bool) {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for a := 0; a < len(n.Attr); a++ {
 			if n.Attr[a].Key == "href" {
@@ -52,14 +52,14 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 
 					if thisURL[0] != '/' {
 						queue.In() <- []string{baseURL, baseURL + "/" + thisURL}
-						children.In() <- baseURL + "/" + thisURL
+						children[baseURL+"/"+thisURL] = true
 					} else {
 						queue.In() <- []string{baseURL, baseURL + thisURL}
-						children.In() <- baseURL + thisURL
+						children[baseURL+thisURL] = true
 					}
 				} else {
 					queue.In() <- []string{baseURL, thisURL}
-					children.In() <- thisURL
+					children[thisURL] = true
 				}
 
 				break
@@ -116,29 +116,16 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 		os.Exit(1)
 	}
 
-	children := channels.NewInfiniteChannel()
+	children := make(map[string]bool)
 
 	EnqueueChildren(doc, currentURL, queue, children)
 
-	// Send resp, url, and last modified to indexer here
-	// (non-blocking)
-
-	childs := make(map[string]int)
-	childrenLen := children.Len()
-	for i := 0; i < childrenLen; i++ {
-		s, ok := (<-children.Out()).(string)
-		if !ok {
-			break
-		}
-		childs[s] += 1
-	}
 	var childsArr []string
-	for k, _ := range childs {
+	for k, _ := range children {
 		childsArr = append(childsArr, k)
 	}
 
 	indexer.Index(htmlData, currentURL, lm, ps, mutex, inv, forw, parentURL, childsArr)
 
-	children.Close()
 	resp.Body.Close()
 }

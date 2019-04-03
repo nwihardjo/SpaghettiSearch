@@ -293,7 +293,7 @@ func Index(doc []byte, urlString string,
 					time.Now(),
 					0,
 					nil,
-					[]uint16{uint16(nextDocID)},
+					[]uint16{uint16(docID)},
 					nil,
 				}
 				docInfoBytes, err := json.Marshal(docInfoC)
