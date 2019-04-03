@@ -1,12 +1,7 @@
 package database
 
-//package main
-
 import (
-	//"context"
 	"encoding/json"
-	//"fmt"
-	//"github.com/apsdehal/go-logger"
 	"net/url"
 	"strconv"
 	"strings"
