@@ -149,7 +149,6 @@ func main() {
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
-	//forw[3].Debug_Print(ctx)
 
 	//Output into a file
 	f, err := os.Create("./spider_result.txt")
