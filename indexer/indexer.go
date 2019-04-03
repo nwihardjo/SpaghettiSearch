@@ -1,29 +1,30 @@
 package indexer
 
 import (
-"the-SearchEngine/database"
-"context"
-"fmt"
-"golang.org/x/net/html"
-// "reflect"
-"strconv"
-//"github.com/apsdehal/go-logger"
-"time"
-"io/ioutil"
-"bytes"
-"sync"
-"strings"
-"os"
-// "io"
-"regexp"
-"net/url"
-"github.com/surgebase/porter2"
-"github.com/dgraph-io/badger"
-"encoding/json"
+	"context"
+	"fmt"
+	"golang.org/x/net/html"
+	"the-SearchEngine/database"
+	// "reflect"
+	"strconv"
+	//"github.com/apsdehal/go-logger"
+	"bytes"
+	"io/ioutil"
+	"os"
+	"strings"
+	"sync"
+	"time"
+	// "io"
+	"encoding/json"
+	"github.com/dgraph-io/badger"
+	"github.com/surgebase/porter2"
+	"net/url"
+	"regexp"
 )
 
 var docsDir = "docs/"
 var stopWords = make(map[string]bool)
+
 func isStopWord(s string) (isStop bool) {
 	// create stopWords map if its 0
 	if len(stopWords) == 0 {
@@ -33,7 +34,7 @@ func isStopWord(s string) (isStop bool) {
 			panic(err)
 		}
 		wordString := strings.Split(string(content), "\n")
-		for _,word := range wordString {
+		for _, word := range wordString {
 			stopWords[word] = true
 		}
 	}
@@ -46,9 +47,9 @@ func laundry(s string) (c []string) {
 	s = regex.ReplaceAllString(s, " ")
 	// remove unnecessary spaces
 	regex = regexp.MustCompile("[^\\s]+")
-	words:= regex.FindAllString(s,-1)
+	words := regex.FindAllString(s, -1)
 	// loop through each word and clean them ~laundry time~
-	for _,word := range words {
+	for _, word := range words {
 		cleaned := strings.TrimSpace(strings.ToLower(word))
 		cleaned = porter2.Stem(cleaned)
 		if !isStopWord(cleaned) {
@@ -58,17 +59,17 @@ func laundry(s string) (c []string) {
 	return
 }
 
-func getWordInfo(words []string) (termFreq map[string]uint32,termPos map[string][]uint32){
+func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string][]uint32) {
 	termFreq = make(map[string]uint32)
 	termPos = make(map[string][]uint32)
 	for pos, word := range words {
 		termPos[word] = append(termPos[word], uint32(pos))
-		termFreq[word] = termFreq[word]+1
+		termFreq[word] = termFreq[word] + 1
 	}
 	return
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID int, forward []database.DB, inverted database.DB_Inverted){
+func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID int, forward []database.DB, inverted database.DB_Inverted) {
 	// set InvKeyword_value
 	invKeyVal := database.InvKeyword_value{uint16(nextDocID), pos[word]}
 	mInvVal, err := json.Marshal(invKeyVal)
@@ -76,7 +77,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 		panic(err)
 	}
 	// set InvKeyword_values
-	invKeyVals := []database.InvKeyword_value{invKeyVal,}
+	invKeyVals := []database.InvKeyword_value{invKeyVal}
 	mInvVals, err := json.Marshal(invKeyVals)
 	if err != nil {
 		panic(err)
@@ -87,27 +88,27 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	// if there is no word to wordID mapping
 	if err == badger.ErrKeyNotFound {
 		// get latest wordID
-			nextWordIDBytes, errNext := forward[4].Get(ctx, []byte("nextWordID"))
-			if errNext == badger.ErrKeyNotFound {
-				// masukkin 0 as nextWordID
-				nextWordIDBytes = []byte(strconv.Itoa(0))
-				forward[4].Set(ctx, []byte("nextWordID"), nextWordIDBytes)
-			} else if errNext != nil {
-				panic(errNext)
-			}
-			nextWordID, err := strconv.Atoi(string(nextWordIDBytes))
-			if err != nil {
-				panic(err)
-			}
-			// use nextWordID
-			wordID = []byte(strconv.Itoa(nextWordID))
-			// fmt.Println("new", newWordID)
-			// forw[0] save word -> wordID
-			forward[0].Set(ctx, []byte(word), wordID)
-			// forw[1] save wordID -> word
-			forward[1].Set(ctx, wordID, []byte(word))
-			// update latest wordID
-			forward[4].Set(ctx, []byte("nextWordID"), []byte(strconv.Itoa(nextWordID + 1)))
+		nextWordIDBytes, errNext := forward[4].Get(ctx, []byte("nextWordID"))
+		if errNext == badger.ErrKeyNotFound {
+			// masukkin 0 as nextWordID
+			nextWordIDBytes = []byte(strconv.Itoa(0))
+			forward[4].Set(ctx, []byte("nextWordID"), nextWordIDBytes)
+		} else if errNext != nil {
+			panic(errNext)
+		}
+		nextWordID, err := strconv.Atoi(string(nextWordIDBytes))
+		if err != nil {
+			panic(err)
+		}
+		// use nextWordID
+		wordID = []byte(strconv.Itoa(nextWordID))
+		// fmt.Println("new", newWordID)
+		// forw[0] save word -> wordID
+		forward[0].Set(ctx, []byte(word), wordID)
+		// forw[1] save wordID -> word
+		forward[1].Set(ctx, wordID, []byte(word))
+		// update latest wordID
+		forward[4].Set(ctx, []byte("nextWordID"), []byte(strconv.Itoa(nextWordID+1)))
 	} else if err != nil {
 		panic(err)
 	}
@@ -116,7 +117,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	if err != nil {
 		panic(err)
 	}
-	if hasWordID{
+	if hasWordID {
 		// append both values are byte[]
 		inverted.AppendValue(ctx, wordID, mInvVal)
 	} else {
@@ -125,7 +126,6 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	}
 	return
 }
-
 
 func AddParent(currentURL string, parents []string,
 	forw []database.DB, wgIndexer *sync.WaitGroup) {
@@ -221,7 +221,7 @@ func Index(doc []byte, urlString string,
 		docIDBytes = nextDocIDBytes
 		// add this doc to forw[2]
 		forward[2].Set(ctx, URLBytes, docIDBytes)
-		forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
+		forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID+1)))
 	}
 	docID, err := strconv.Atoi(string(docIDBytes))
 	if err != nil {
@@ -237,19 +237,19 @@ func Index(doc []byte, urlString string,
 		}
 		token := tokenizer.Token()
 		switch tokenType {
-			case html.StartTagToken:
+		case html.StartTagToken:
 			if token.Data == "title" {
-			tokenizer.Next()
-			title = strings.TrimSpace(tokenizer.Token().Data)
-		}
-		prevToken = token.Data
-		break
+				tokenizer.Next()
+				title = strings.TrimSpace(tokenizer.Token().Data)
+			}
+			prevToken = token.Data
+			break
 		case html.TextToken:
 			cleaned = strings.TrimSpace(token.Data)
-			if prevToken != "script" && prevToken != "a" && prevToken != "style" && cleaned != ""{
+			if prevToken != "script" && prevToken != "a" && prevToken != "style" && cleaned != "" {
 				words = append(words, cleaned)
 			}
-		break
+			break
 		}
 	}
 	// tokenize terms in title and body
@@ -270,10 +270,10 @@ func Index(doc []byte, urlString string,
 	var kids []uint16
 	// get the URL mapping of each child
 	if children != nil {
-		for _,child := range children {
+		for _, child := range children {
 			// fmt.Println(child)
 			childURL, err := url.Parse(child)
-			if err != nil{
+			if err != nil {
 				panic(err)
 			}
 			mChildURL, errMarshal := childURL.MarshalBinary()
@@ -297,7 +297,7 @@ func Index(doc []byte, urlString string,
 					time.Now(),
 					0,
 					nil,
-					[]uint16{uint16(nextDocID),},
+					[]uint16{uint16(nextDocID)},
 					nil,
 				}
 				docInfoBytes, err := json.Marshal(docInfoC)
@@ -310,7 +310,7 @@ func Index(doc []byte, urlString string,
 				// set childID
 				childIDBytes = nextDocIDBytes
 				// update nextDocID
-				forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID + 1)))
+				forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID+1)))
 			}
 			childID, err := strconv.Atoi(string(childIDBytes))
 			if err != nil {
@@ -375,11 +375,11 @@ func Index(doc []byte, urlString string,
 
 	// Save to file
 	if _, err := os.Stat(docsDir); os.IsNotExist(err) {
-	os.Mkdir(docsDir, 0755)
+		os.Mkdir(docsDir, 0755)
 	}
-	err = ioutil.WriteFile(docsDir + strconv.Itoa(nextDocID), doc, 0644)
+	err = ioutil.WriteFile(docsDir+strconv.Itoa(nextDocID), doc, 0644)
 	if err != nil {
-	panic(err)
+		panic(err)
 	}
 	fmt.Println("i RETURNED")
 }

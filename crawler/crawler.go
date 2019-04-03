@@ -1,18 +1,18 @@
 package crawler
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/eapache/channels"
 	"golang.org/x/net/html"
 	"io/ioutil"
-	"the-SearchEngine/indexer"
-	"the-SearchEngine/database"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
+	"the-SearchEngine/database"
+	"the-SearchEngine/indexer"
 	"time"
-	"bytes"
 )
 
 func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChannel, children *channels.InfiniteChannel) {
@@ -21,7 +21,10 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 			if n.Attr[a].Key == "href" {
 
 				/* Skip if no href or if href is anchor */
-				if n.Attr[a].Val == "" || n.Attr[a].Val[0] == '#' {
+				if n.Attr[a].Val == "" ||
+					n.Attr[a].Val[0] == '#' ||
+					(len(n.Attr[a].Val) >= 10 && n.Attr[a].Val[:10] == "javascript") ||
+					(len(n.Attr[a].Val) >= 6 && n.Attr[a].Val[:6] == "mailto") {
 					continue
 				}
 
@@ -34,7 +37,8 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				}
 
 				/*
-					If the href starts with '/', append this to baseURL
+					If the href does not start with 'http' or 'www',
+					append this to baseURL
 					Example:
 						baseURL = "https://example.com"
 						href = "/admin"
@@ -43,10 +47,12 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				if len(thisURL) == 0 {
 					continue
 				}
-				if thisURL[0] == '/' {
-					if baseURL[len(baseURL)-1] == '/' {
-						queue.In() <- []string{baseURL, baseURL[:len(baseURL)-1] + thisURL}
-						children.In() <- baseURL[:len(baseURL)-1] + thisURL
+				if len(thisURL) < 4 ||
+					(thisURL[:4] != "http" && thisURL[:4] != "www.") {
+
+					if thisURL[0] != '/' {
+						queue.In() <- []string{baseURL, baseURL + "/" + thisURL}
+						children.In() <- baseURL + "/" + thisURL
 					} else {
 						queue.In() <- []string{baseURL, baseURL + thisURL}
 						children.In() <- baseURL + thisURL

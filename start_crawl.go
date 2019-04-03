@@ -1,33 +1,33 @@
 package main
 
 import (
-	"the-SearchEngine/crawler"
-	"the-SearchEngine/database"
-  "the-SearchEngine/indexer"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
 	"net/http"
 	"os"
-	"sync"
-	"time"
+	"strconv"
 	"strings"
-	"encoding/json"
-  	"strconv"
+	"sync"
+	"the-SearchEngine/crawler"
+	"the-SearchEngine/database"
+	"the-SearchEngine/indexer"
+	"time"
 )
 
 func main() {
 	fmt.Println("Crawler started...")
 
-	start := time.Now() 
+	start := time.Now()
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 
-	startURL := "https://www.cse.ust.hk/"
+	startURL := "https://www.cse.ust.hk"
 	numOfPages := 30
 	maxThreadNum := 50
 	visited := channels.NewInfiniteChannel()
@@ -39,7 +39,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.TODO())
 	log, _ := logger.New("test", 1)
 	inv, forw, _ := database.DB_init(ctx, log)
-	// TODO: Check nextDocID here
 	for _, bdb_i := range inv {
 		defer bdb_i.Close(ctx, cancel)
 	}
@@ -113,11 +112,9 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		fmt.Println("1life is confusing")
 
 		/* Wait for all children to finish */
 		wg.Wait()
-		fmt.Println("2life is confusing")
 
 		/*
 			Run function AddParent using goroutine
@@ -149,13 +146,12 @@ func main() {
 	visited.Close()
 	queue.Close()
 
-	fmt.Println("life is confusing")
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
-	forw[3].Debug_Print(ctx)
-	
-	//Output into a file	
+	//forw[3].Debug_Print(ctx)
+
+	//Output into a file
 	f, err := os.Create("./spider_result.txt")
 	if err != nil {
 		panic(err)
@@ -172,7 +168,7 @@ func main() {
 		var tempDocInfo database.DocInfo
 		err = json.Unmarshal(kv.Value, &tempDocInfo)
 		if err != nil {
-			panic(err)	
+			panic(err)
 		}
 		// Remove unscraped data, present for the sake of printing out child url
 		if tempDocInfo.Page_size == 0 {
@@ -194,10 +190,10 @@ func main() {
 			}
 			wordFreq = append(wordFreq, string(word)+" "+strconv.Itoa(int(freq)))
 		}
-		
+
 		// Iterate through the children of the URL
 		childUrl := []string{}
-		for _, child := range v.Children{
+		for _, child := range v.Children {
 			var tempData database.DocInfo
 			byteDocInfo, err := forw[3].Get(ctx, []byte(strconv.Itoa(int(child))))
 			if err != nil {
@@ -209,12 +205,12 @@ func main() {
 			}
 			childUrl = append(childUrl, "Child "+tempData.Url.String())
 		}
-		
+
 		// Append all info for a document into a formatted string to be written
 		output := []string{strings.Join(v.Page_title, " "), v.Url.String(), strings.Join(lineThree, ", "), strings.Join(wordFreq, "; "), strings.Join(childUrl, " \n"), outputSeparator}
 		_, err := f.WriteString(strings.Join(output, " \n"))
 		if err != nil {
-			panic(err)	
+			panic(err)
 		}
 		f.Sync()
 	}
