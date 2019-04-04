@@ -66,7 +66,9 @@ func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string
 	return
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID int, forward []database.DB, inverted database.DB_Inverted) {
+func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID int, forward []database.DB, inverted database.DB_Inverted,
+	batchDB_forw []*badger.WriteBatch, batchDB_inv *badger.WriteBatch, nWID *int) {
+
 	// set InvKeyword_value
 	invKeyVal := database.InvKeyword_value{uint16(nextDocID), pos[word]}
 	mInvVal, err := json.Marshal(invKeyVal)
@@ -84,28 +86,16 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	// fmt.Println(nextWordID)
 	// if there is no word to wordID mapping
 	if err == badger.ErrKeyNotFound {
-		// get latest wordID
-		nextWordIDBytes, errNext := forward[4].Get(ctx, []byte("nextWordID"))
-		if errNext == badger.ErrKeyNotFound {
-			// masukkin 0 as nextWordID
-			nextWordIDBytes = []byte(strconv.Itoa(0))
-			forward[4].Set(ctx, []byte("nextWordID"), nextWordIDBytes)
-		} else if errNext != nil {
-			panic(errNext)
-		}
-		nextWordID, err := strconv.Atoi(string(nextWordIDBytes))
-		if err != nil {
-			panic(err)
-		}
 		// use nextWordID
-		wordID = []byte(strconv.Itoa(nextWordID))
+		wordID = []byte(strconv.Itoa(nWID))
 		// fmt.Println("new", newWordID)
 		// forw[0] save word -> wordID
-		forward[0].Set(ctx, []byte(word), wordID)
+		batchDB_forw[0].Set([]byte(word), wordID)
 		// forw[1] save wordID -> word
-		forward[1].Set(ctx, wordID, []byte(word))
+		batchDB_forw[1].Set(wordID, []byte(word))
 		// update latest wordID
-		forward[4].Set(ctx, []byte("nextWordID"), []byte(strconv.Itoa(nextWordID+1)))
+		batchDB_forw[4].Set([]byte("nextWordID"), []byte(strconv.Itoa(nWID+1)))
+		nWID += 1
 	} else if err != nil {
 		panic(err)
 	}
@@ -116,10 +106,41 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	}
 	if hasWordID {
 		// append both values are byte[]
-		inverted.AppendValue(ctx, wordID, mInvVal)
+		//inverted.AppendValue(ctx, wordID, mInvVal)
+		value, err := inverted.Get(ctx, wordID)
+		if err != nil {
+			return err
+		}
+
+		var appendedValue_struct database.InvKeyword_value
+		var tempValues database.InvKeyword_values
+		err = json.Unmarshal(mInvVal, &tempValues)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(appendedValue, &appendedValue_struct)
+		if err != nil {
+			return err
+		}
+
+		tempValues = append(tempValues, appendedValue_struct)
+		tempVal, err := json.Marshal(tempValues)
+		if err != nil {
+			return err
+		}
+
+		// delete and set the new appended values
+		// TODO: optimise the operation
+		// if err = bdb_i.Delete(ctx, key); err != nil {
+		// 	return err
+		// }
+		if err = batchDB_inv.Set(wordID, tempVal); err != nil {
+			return err
+		}
 	} else {
 		// insert the list of inv
-		inverted.Set(ctx, wordID, mInvVals)
+		//inverted.Set(ctx, wordID, mInvVals)
+		batchDB_inv.Set(wordID, mInvVals)
 	}
 	return
 }
@@ -258,20 +279,37 @@ func Index(doc []byte, urlString string,
 
 	var batchDB_inv, batchDB_frw []*badger.WriteBatch	
 	for _, invPointer := range inverted {
-		batchDB_inv = append(batchDB_inv, invPointer.BatchWrite_init(ctx))
-		defer invPointer.Cancel()
+		temp_ := invPointer.BatchWrite_init(ctx)
+		batchDB_inv = append(batchDB_inv, temp_)
+		defer temp_.Cancel()
 	}
 	for _, forwPointer := range forward { 
-	batchDB_frw = append(batchDB_frw, forwPointer.BatchWrite_init(ctx)) defer forwPointer.Cancel()
+		temp_ := forwPointer.BatchWrite_init(ctx)
+		batchDB_frw = append(batchDB_frw, temp_) 
+		defer temp_.Cancel()
 	}
 
-	for _, word := range cleanTitle {
-		// save from title wordID -> [{DocID, Pos}]
-		setInverted(ctx, word, posTitle, docID, forward, inverted[0])
+	nWIDBytes, errNext_ := forward[4].Get(ctx, []byte("nextWordID"))
+	if errNext_ == badger.ErrKeyNotFound {
+		// masukkin 0 as nextWordID
+		nWIDBytes = []byte(strconv.Itoa(0))
+		forward[4].Set(ctx, []byte("nextWordID"), nWIDBytes)
+	} else if errNext_ != nil {
+		panic(errNext_)
 	}
-	for _, word := range cleanBody {
+	nWID, err := strconv.Atoi(string(nWIDBytes))
+	if err != nil {
+		panic(err)
+	}
+
+
+	for word, _ := range posTitle {
+		// save from title wordID -> [{DocID, Pos}]
+		setInverted(ctx, word, posTitle, docID, forward, inverted[0], batchDB_frw, batchDB_inv, &nWID)
+	}
+	for word, _ := range posBody {
 		// save from body wordID-> [{DocID, Pos}]
-		setInverted(ctx, word, posBody, docID, forward, inverted[1])
+		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv, &nWID)
 	}
 
 	for _, f := range batchDB_forw{
