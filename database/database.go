@@ -7,6 +7,7 @@ import (
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
+	"github.com/pkg/errors"
 	bpb "github.com/dgraph-io/badger/pb"
 	"os"
 	"time"
@@ -23,6 +24,14 @@ const (
 var (
 	// BadgerAlertNamespace defines the alerts BadgerDB namespace
 	BadgerAlertNamespace = []byte("alerts")
+	
+	ErrKeyTypeNotMatch = errors.New("Invalid key type, key type must match with the schema defined! Refer to database.go or noschema_schema.go for schema documentation.")
+	
+	ErrValTypeNotMatch = errors.New("Invalid value type, value type must follows with the schema defined! Refer to database.go or noschema_schema.go for schema documentation.")
+
+	ErrKeyTypeNotFound = errors.New("Key type not found, double check the type variable passed")
+	
+	ErrValTypeNotFound = errors.New("Value type not found, double check the type variable passed")
 )
 
 type (
@@ -147,11 +156,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 }
 
 
-func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
-	return bdb.db.NewWriteBatch()
-}
-
-
 func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB_Inverted, error) {
 	opts := getOpts(dir, loadMethod)
 
@@ -206,6 +210,11 @@ func getOpts(loadMethod int, dir string)(opts *badger.Options){
 }
 
 
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
+	return bdb.db.NewWriteBatch()
+}
+
+
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 	return bdb.db.DropAll()
 }
@@ -246,7 +255,13 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, app
 }
 
 
-func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err error) {
+func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interface{}, err error) {
+	key, _, err := checkMarshal(key_, bdb.keyType, nil, nil)
+	if err != nil {
+		panic(err)
+		return nil, err
+	}
+
 	err = bdb.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 
@@ -270,12 +285,16 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 		// other error
 		return nil, err
 	}
-
-	return value, nil
+	
+	value_ = checkUnmarshal(value, bdb.valType)
+	return value_, nil
 }
 
 
-func (bdb *BadgerDB) Set(ctx context.Context, key []byte, value []byte) error {
+func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface{}) error {
+	key, value, err := checkMarshal(key_, bdb.keyType, value_, bdb.valType)
+	if err != nil { return err }
+
 	err := bdb.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, value)
 	})
@@ -288,7 +307,10 @@ func (bdb *BadgerDB) Set(ctx context.Context, key []byte, value []byte) error {
 }
 
 
-func (bdb *BadgerDB) Has(ctx context.Context, key []byte) (ok bool, err error) {
+func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err error) {
+	key, _, err := checkMarshal(key_, bdb.keyType, nil, nil)
+	if err != nil { return nil, err }
+
 	_, err = bdb.Get(ctx, key)
 	switch err {
 	case badger.ErrKeyNotFound:
@@ -300,7 +322,10 @@ func (bdb *BadgerDB) Has(ctx context.Context, key []byte) (ok bool, err error) {
 }
 
 
-func (bdb *BadgerDB) Delete(ctx context.Context, key []byte) error {
+func (bdb *BadgerDB) Delete(ctx context.Context, key_ interface{}) error {
+	key, _, err := checkMarshal(key_, bdb.keyType, nil, nil)
+	if err != nil { return err }
+
 	err := bdb.db.Update(func(txn *badger.Txn) error {
 		err := txn.Delete(key)
 		if err != nil {

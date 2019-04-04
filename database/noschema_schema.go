@@ -24,7 +24,7 @@ import (
 		value	: DocId (type: uint16)
 	Schema for forward table forw[3]:
 		key:	: DocId (type: uint16)
-		value	: information on the documents including URL(type: docInfo) 
+		value	: document info including the URL (type: DocInfo)
 	Schema for forward table forw[4]:
 		key	: index type (type: string)
 		value	: biggest index value (type: uint32)
@@ -128,4 +128,101 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	}
 
 	return nil
+}
+
+// helper function for type checking and conversion to support schema enforcement 
+// @return array of bytes, error
+func checkMarshal(k interface{}, kType string, v interface{}, vType string)(key []byte, v []byte, err error) { 
+        if kType != nil {
+                switch kType {
+                case "string":
+                        tempKey, ok := k.(string)
+                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+			key, er := json.Marshal(tempKey)
+			if er != nil { return nil, nil, er }
+                case "uint16":
+                        tempKey, ok := k.(uint16)
+                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+			key, er := json.Marshal(strconv.Itoa(int(tempKey)))
+			if er != nil { return nil, nil, er }
+                case "uint32":
+                        tempKey, ok := k.(uint32)
+                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+			key, er := json.Marshal(strconv.Itoa(int(tempKey)))
+			if er != nil { return nil, nil, er }
+		/*
+                case "InvKeyword_values":
+                        tempKey, ok := k.(InvKeyword_values)
+                        if !ok { return _, _, ErrKeyTypeNotMatch }
+        	case "InvKeyword_value":
+			tempKey, ok := k.(InvKeyword_value)
+                        if !ok { return _, _, ErrKeyTypeNotMatch }
+	        case "DocInfo": 
+                        tempKey, ok := k.(DocInfo)
+                        if !ok { return _, _, ErrKeyTypeNotMatch }
+                */
+		case "url.URL":
+                        tempKey, ok := k.(url.URL)
+                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+			key, er := tempKey.MarshalBinary()
+			if er != nil { return nil, nil, er }
+		default:
+			return nil, nil, ErrKeyTypeNotFound
+		}
+	} else { 
+		key = nil 
+	}
+
+        if vType != nil {
+                switch vType {
+                case "string":
+                        tempVal, ok := k.(string)
+                        if !ok { return nil, nil, ErrValTypeNotMatch }
+			val, er := json.Marshal(tempKey)
+			if er != nil { return nil, nil, er }
+                case "uint16":
+                        tempVal, ok := k.(uint16)
+                        if !ok { return nil, nil, ErrValTypeNotMatch }
+			val, er := json.Marshal(strconv.Itoa(int(tempKey)))
+			if er != nil { return nil, nil, er }
+                case "uint32":
+                        tempVal, ok := k.(uint32)
+                        if !ok { return nil, nil, ErrValTypeNotMatch }
+			val, er := json.Marshal(strconv.Itoa(int(tempKey)))
+			if er != nil { return nil, nil, er }
+                case "InvKeyword_values":
+                        tempVal, ok := k.(InvKeyword_values)
+                        if !ok { return nil, nil, ErrValTypeNotMatch }
+			val, er := json.Marshal(tempKey)
+			if er != nil { return nil, nil, er }
+        	case "InvKeyword_value":
+			tempVal, ok := k.(InvKeyword_value)
+                        if !ok { return nil, nil, ErrValTypeNotMatch }
+			val, er := json.Marshal(tempKey)
+			if er != nil { return nil, nil, er }
+	        case "DocInfo": 
+                        tempVal, ok := k.(DocInfo)
+                        if !ok { return nil, nil, ErrValTypeNotMatch }
+			val, er := json.Marshal(tempKey)
+			if er != nil { return nil, nil, er }
+                /*
+		case "url.URL":
+                        tempKey, ok := k.(url.URL)
+                        if !ok { return _, _, ErrKeyTypeNotMatch }
+		*/
+		default:
+			return _, _, ErrValTypeNotFound
+		}
+	} else { 
+		val = nil 
+	}
+
+	err = nil
+	return 
+}
+
+func checkUnmarshal (v []byte, valType string)(v interface{}, err error) {
+	switch valType {
+	case "string":
+		tempVal
 }
