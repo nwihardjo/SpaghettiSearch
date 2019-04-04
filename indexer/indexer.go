@@ -256,12 +256,13 @@ func Index(doc []byte, urlString string,
 	_, posTitle := getWordInfo(cleanTitle)
 	freqBody, posBody := getWordInfo(cleanBody)
 
-	invBatch, forw := BatchWrite_init(ctx, inverted, forward)
-	for _, invPointer := range invBatch {
+	var batchDB_inv, batchDB_frw []*badger.WriteBatch	
+	for _, invPointer := range inverted {
+		batchDB_inv = append(batchDB_inv, invPointer.BatchWrite_init(ctx))
 		defer invPointer.Cancel()
 	}
-	for _, forwPointer := range forwBatch {
-		defer forwPointer.Cancel()
+	for _, forwPointer := range forward { 
+	batchDB_frw = append(batchDB_frw, forwPointer.BatchWrite_init(ctx)) defer forwPointer.Cancel()
 	}
 
 	for _, word := range cleanTitle {
@@ -272,6 +273,13 @@ func Index(doc []byte, urlString string,
 		// save from body wordID-> [{DocID, Pos}]
 		setInverted(ctx, word, posBody, docID, forward, inverted[1])
 	}
+
+	for _, f := range batchDB_forw{
+		f.Flush()
+	}
+	for _, i := range batchDB_inv{
+		i.Flush()
+	} 
 	var kids []uint16
 	// get the URL mapping of each child
 	if children != nil {
