@@ -144,6 +144,8 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 		opts.ValueLogLoadingMode = options.FileIO
 	}
 
+	opts.SyncWrites = false
+
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
@@ -172,7 +174,7 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadInt
 	}
 
 	// set SyncWrites to False for performance increase but may cause loss of data
-	opts.SyncWrites = true
+	opts.SyncWrites = false
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
