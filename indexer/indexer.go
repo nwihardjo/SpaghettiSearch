@@ -255,6 +255,15 @@ func Index(doc []byte, urlString string,
 	// get words info
 	_, posTitle := getWordInfo(cleanTitle)
 	freqBody, posBody := getWordInfo(cleanBody)
+
+	invBatch, forw := BatchWrite_init(ctx, inverted, forward)
+	for _, invPointer := range invBatch {
+		defer invPointer.Cancel()
+	}
+	for _, forwPointer := range forwBatch {
+		defer forwPointer.Cancel()
+	}
+
 	for _, word := range cleanTitle {
 		// save from title wordID -> [{DocID, Pos}]
 		setInverted(ctx, word, posTitle, docID, forward, inverted[0])

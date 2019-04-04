@@ -63,7 +63,7 @@ type (
 		Iterate(ctx context.Context) (*collector, error)
 
 		// batch write api to minimise the creation of transaction
-		// BatchSet(ctx context.Context, key []byte, value []byte) error
+		BatchSet(ctx context.Context, key []byte, keyType string, value []byte, valueType string) error
 
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
@@ -127,6 +127,16 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	}
 
 	return inv, forw, nil
+}
+
+func BatchWrite_init(ctx context.Context, inv []BadgerDB_Inverted, forw []BadgerDB)(invBatch []*badger.WriteBatch, forwBatch []*badger.WriteBatch){
+	for _, v := inv {
+		invBatch = append(invBatch, v.bdb.NewWriteBatch())
+	}
+	for _, v := forw {
+		forwBatch = append(forwBatch, v.bdb.NewWriteBatch())
+
+	return
 }
 
 func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB_Inverted, error) {
