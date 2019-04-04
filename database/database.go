@@ -62,6 +62,9 @@ type (
 		// data is in random , due to concurrency
 		Iterate(ctx context.Context) (*collector, error)
 
+		// batch write api to minimise the creation of transaction
+		// BatchSet(ctx context.Context, key []byte, value []byte) error
+
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
 	}
@@ -88,8 +91,10 @@ type (
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
-	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
-	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": true, "DocId_docInfo/": true, "Indexes/": true}
+	temp := 2
+
+	inverted_dir := map[string]int{"invKeyword_body/": temp, "invKeyword_title/": temp}
+	forward_dir := map[string]int{"Word_wordId/": temp, "WordId_word": temp, "URL_docId/": temp, "DocId_docInfo/": temp, "Indexes/": temp}
 
 	// create directory if not exist
 	for d, _ := range inverted_dir {
@@ -124,13 +129,20 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	return inv, forw, nil
 }
 
-func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM bool) (DB_Inverted, error) {
+func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB_Inverted, error) {
 	opts := badger.DefaultOptions
-	if loadIntoRAM {
+	opts.Dir, opts.ValueDir = dir, dir
+	
+	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
+	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
+	// 2 for store everything in disk, require extensive Disk
+	if loadIntoRAM == 1 {
 		// How should LSM tree be accessed
 		opts.TableLoadingMode = options.LoadToRAM
+	} else if loadIntoRAM == 2 {
+		opts.TableLoadingMode = options.FileIO
+		opts.ValueLogLoadingMode = options.FileIO
 	}
-	opts.Dir, opts.ValueDir = dir, dir
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
@@ -144,15 +156,23 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 	return bdb_i, nil
 }
 
-func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM bool) (DB, error) {
+func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB, error) {
 	opts := badger.DefaultOptions
-	if loadIntoRAM {
+	opts.Dir, opts.ValueDir = dir, dir
+	
+	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
+	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
+	// 2 for store everything in disk, require extensive Disk
+	if loadIntoRAM == 1 {
 		// How should LSM tree be accessed
 		opts.TableLoadingMode = options.LoadToRAM
+	} else if loadIntoRAM == 2 {
+		opts.TableLoadingMode = options.FileIO
+		opts.ValueLogLoadingMode = options.FileIO
 	}
+
 	// set SyncWrites to False for performance increase but may cause loss of data
 	opts.SyncWrites = true
-	opts.Dir, opts.ValueDir = dir, dir
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
