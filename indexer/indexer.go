@@ -87,15 +87,15 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	// if there is no word to wordID mapping
 	if err == badger.ErrKeyNotFound {
 		// use nextWordID
-		wordID = []byte(strconv.Itoa(nWID))
+		wordID = []byte(strconv.Itoa(*nWID))
 		// fmt.Println("new", newWordID)
 		// forw[0] save word -> wordID
-		batchDB_forw[0].Set([]byte(word), wordID)
+		batchDB_forw[0].Set([]byte(word), wordID, 0)
 		// forw[1] save wordID -> word
-		batchDB_forw[1].Set(wordID, []byte(word))
+		batchDB_forw[1].Set(wordID, []byte(word), 0)
 		// update latest wordID
-		batchDB_forw[4].Set([]byte("nextWordID"), []byte(strconv.Itoa(nWID+1)))
-		nWID += 1
+		batchDB_forw[4].Set([]byte("nextWordID"), []byte(strconv.Itoa(*nWID+1)), 0)
+		*nWID += 1
 	} else if err != nil {
 		panic(err)
 	}
@@ -109,24 +109,24 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 		//inverted.AppendValue(ctx, wordID, mInvVal)
 		value, err := inverted.Get(ctx, wordID)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		var appendedValue_struct database.InvKeyword_value
 		var tempValues database.InvKeyword_values
-		err = json.Unmarshal(mInvVal, &tempValues)
+		err = json.Unmarshal(value, &tempValues)
 		if err != nil {
-			return err
+			panic(err)
 		}
-		err = json.Unmarshal(appendedValue, &appendedValue_struct)
+		err = json.Unmarshal(mInvVal, &appendedValue_struct)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		tempValues = append(tempValues, appendedValue_struct)
 		tempVal, err := json.Marshal(tempValues)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		// delete and set the new appended values
@@ -134,13 +134,13 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 		// if err = bdb_i.Delete(ctx, key); err != nil {
 		// 	return err
 		// }
-		if err = batchDB_inv.Set(wordID, tempVal); err != nil {
-			return err
+		if err = batchDB_inv.Set(wordID, tempVal, 0); err != nil {
+			panic(err)
 		}
 	} else {
 		// insert the list of inv
 		//inverted.Set(ctx, wordID, mInvVals)
-		batchDB_inv.Set(wordID, mInvVals)
+		batchDB_inv.Set(wordID, mInvVals, 0)
 	}
 	return
 }
@@ -277,7 +277,8 @@ func Index(doc []byte, urlString string,
 	_, posTitle := getWordInfo(cleanTitle)
 	freqBody, posBody := getWordInfo(cleanBody)
 
-	var batchDB_inv, batchDB_frw []*badger.WriteBatch	
+	var batchDB_inv []*badger.WriteBatch
+	var batchDB_frw []*badger.WriteBatch
 	for _, invPointer := range inverted {
 		temp_ := invPointer.BatchWrite_init(ctx)
 		batchDB_inv = append(batchDB_inv, temp_)
@@ -305,14 +306,14 @@ func Index(doc []byte, urlString string,
 
 	for word, _ := range posTitle {
 		// save from title wordID -> [{DocID, Pos}]
-		setInverted(ctx, word, posTitle, docID, forward, inverted[0], batchDB_frw, batchDB_inv, &nWID)
+		setInverted(ctx, word, posTitle, docID, forward, inverted[0], batchDB_frw, batchDB_inv[0], &nWID)
 	}
 	for word, _ := range posBody {
 		// save from body wordID-> [{DocID, Pos}]
-		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv, &nWID)
+		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv[1], &nWID)
 	}
 
-	for _, f := range batchDB_forw{
+	for _, f := range batchDB_frw{
 		f.Flush()
 	}
 	for _, i := range batchDB_inv{
