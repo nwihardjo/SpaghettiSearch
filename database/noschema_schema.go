@@ -21,10 +21,10 @@ import (
 		value	: word (type: string)
 	Schema for forward table forw[2]:
 		key	: URL (type url.URL)
-		value	: document info including DocId (type: DocInfo)
+		value	: DocId (type: uint16)
 	Schema for forward table forw[3]:
 		key:	: DocId (type: uint16)
-		value	: URL (type: url.URL)
+		value	: document info including the URL (type: DocInfo)
 	Schema for forward table forw[4]:
 		key	: index type (type: string)
 		value	: biggest index value (type: uint32)
