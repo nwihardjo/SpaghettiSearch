@@ -10,6 +10,7 @@ import (
 	bpb "github.com/dgraph-io/badger/pb"
 	"os"
 	"time"
+	"strconv"
 )
 
 const (
@@ -63,9 +64,8 @@ type (
 		Iterate(ctx context.Context) (*collector, error)
 
 		// batch write api to minimise the creation of transaction
-		//BatchSet(ctx context.Context, key []byte, keyType string, value []byte, valueType string) error
-
 		BatchWrite_init(ctx context.Context) *badger.WriteBatch
+
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
 	}
@@ -73,6 +73,8 @@ type (
 	BadgerDB struct {
 		db     *badger.DB
 		logger *logger.Logger
+		keyType	string
+		valType	string
 	}
 )
 
@@ -92,10 +94,24 @@ type (
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
+	
+	// table loading mode
+	// default is MemoryMap, 1 is LoadToRAM (most optimised), 2 is FileIO (all disk)
 	temp := 2
 
-	inverted_dir := map[string]int{"invKeyword_body/": temp, "invKeyword_title/": temp}
-	forward_dir := map[string]int{"Word_wordId/": temp, "WordId_word": temp, "URL_docId/": temp, "DocId_docInfo/": temp, "Indexes/": temp}
+	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement	
+	inverted := map[string][]string{
+		"invKeyword_body/": []string{strconv.Itoa(temp), "uint32", "InvKeyword_values"},
+		"invKeyword_title/": []string{strconv.Itoa(temp), "uint32", "InvKeyword_values"}
+	}
+
+	forward := map[string][]string{
+		"Word_wordId/": []string{strconv.Itoa(temp), "string", "uint32"}, 
+		"WordId_word/": []string{strconv.Itoa(temp), "uint32", "string"}, 
+		"URL_docId/": []string{strconv.Itoa(temp), "url.URL", "uint16"},
+		"DocId_docInfo/": []string{strconv.Itoa(temp), "uint16", "DocInfo"},
+		"Indexes/": []string{strconv.Itoa(temp), "string", "uint16"}
+	}
 
 	// create directory if not exist
 	for d, _ := range inverted_dir {
@@ -111,16 +127,16 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	}
 
 	// initiate table object
-	for k, v := range inverted_dir {
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, v)
+	for k, v := range inverted {
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, strconv.Atoi(v[0]), v[1], v[2])
 		if err != nil {
 			return nil, nil, err
 		}
 		inv = append(inv, temp)
 	}
 
-	for k, v := range forward_dir {
-		temp, err := NewBadgerDB(ctx, base_dir+k, logger, v)
+	for k, v := range forward {
+		temp, err := NewBadgerDB(ctx, base_dir+k, logger, strconv.Atoi(v[0]), v[1], v[2])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -130,28 +146,16 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	return inv, forw, nil
 }
 
+
 func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
 	return bdb.db.NewWriteBatch()
 }
 
-func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB_Inverted, error) {
-	opts := badger.DefaultOptions
-	opts.Dir, opts.ValueDir = dir, dir
-	
-	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
-	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
-	// 2 for store everything in disk, require extensive Disk
-	if loadIntoRAM == 1 {
-		// How should LSM tree be accessed
-		opts.TableLoadingMode = options.LoadToRAM
-	} else if loadIntoRAM == 2 {
-		opts.TableLoadingMode = options.FileIO
-		opts.ValueLogLoadingMode = options.FileIO
-	}
 
-	opts.SyncWrites = true
+func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB_Inverted, error) {
+	opts := getOpts(dir, loadMethod)
 
-	badgerDB, err := badger.Open(opts)
+	badgerDB, err := badger.Open(*opts)
 	if err != nil {
 		return nil, err
 	}
@@ -163,25 +167,11 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 	return bdb_i, nil
 }
 
-func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB, error) {
-	opts := badger.DefaultOptions
-	opts.Dir, opts.ValueDir = dir, dir
-	
-	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
-	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
-	// 2 for store everything in disk, require extensive Disk
-	if loadIntoRAM == 1 {
-		// How should LSM tree be accessed
-		opts.TableLoadingMode = options.LoadToRAM
-	} else if loadIntoRAM == 2 {
-		opts.TableLoadingMode = options.FileIO
-		opts.ValueLogLoadingMode = options.FileIO
-	}
 
-	// set SyncWrites to False for performance increase but may cause loss of data
-	opts.SyncWrites = true
+func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMethod int) (DB, error, keyType string, valType string) {
+	opts := getOpts(loadMethod, dir)
 
-	badgerDB, err := badger.Open(opts)
+	badgerDB, err := badger.Open(*opts)
 	if err != nil {
 		return nil, err
 	}
@@ -196,9 +186,30 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadInt
 	return bdb, nil
 }
 
+
+// helper function for ease of DB configurations tuning
+func getOpts(loadMethod int, dir string)(opts *badger.Options){
+	opts = badger.DefaultOptions
+	opts.Dir, opts.ValueDir = dir, dir
+
+	// SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
+	opts.SyncWrites = true
+
+	// loadMethod: default is MemoryMap, 1 for loading to memory (LoadToRAM), 2 for storing all into disk (FileIO) which resulted in extensive disk IO
+	switch loadMethod {
+		case 1: 
+			opts.TableLoadingMode = options.LoadToRAM
+		case 2:
+			opts.TableLoadingMode, opts.ValueLogLoadingMode = options.FileIO, options.FileIO
+	}
+	return		
+}
+
+
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 	return bdb.db.DropAll()
 }
+
 
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, appendedValue []byte) error {
 	value, err := bdb_i.Get(ctx, key)
@@ -234,6 +245,7 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key []byte, app
 	return nil
 }
 
+
 func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err error) {
 	err = bdb.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
@@ -262,6 +274,7 @@ func (bdb *BadgerDB) Get(ctx context.Context, key []byte) (value []byte, err err
 	return value, nil
 }
 
+
 func (bdb *BadgerDB) Set(ctx context.Context, key []byte, value []byte) error {
 	err := bdb.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, value)
@@ -274,6 +287,7 @@ func (bdb *BadgerDB) Set(ctx context.Context, key []byte, value []byte) error {
 	return nil
 }
 
+
 func (bdb *BadgerDB) Has(ctx context.Context, key []byte) (ok bool, err error) {
 	_, err = bdb.Get(ctx, key)
 	switch err {
@@ -284,6 +298,7 @@ func (bdb *BadgerDB) Has(ctx context.Context, key []byte) (ok bool, err error) {
 	}
 	return
 }
+
 
 func (bdb *BadgerDB) Delete(ctx context.Context, key []byte) error {
 	err := bdb.db.Update(func(txn *badger.Txn) error {
@@ -297,11 +312,13 @@ func (bdb *BadgerDB) Delete(ctx context.Context, key []byte) error {
 	return err
 }
 
+
 func (bdb *BadgerDB) Close(ctx context.Context, cancel context.CancelFunc) error {
 	// perform cancellation of the running process using context
 	cancel()
 	return bdb.db.Close()
 }
+
 
 func (bdb *BadgerDB) runGC(ctx context.Context) {
 	ticker := time.NewTicker(badgerGCInterval)
@@ -322,14 +339,17 @@ func (bdb *BadgerDB) runGC(ctx context.Context) {
 	}
 }
 
+
 type collector struct {
 	KV []*bpb.KV
 }
+
 
 func (c *collector) Send(list *bpb.KVList) error {
 	c.KV = append(c.KV, list.Kv...)
 	return nil
 }
+
 
 func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	stream := bdb.db.NewStream()
@@ -347,6 +367,7 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	}
 	return c, nil
 }
+
 
 func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
 	err := bdb.db.View(func(txn *badger.Txn) error {
