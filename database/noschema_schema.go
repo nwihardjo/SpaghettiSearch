@@ -12,7 +12,7 @@ import (
 =============================== SCHEMA DEFINITION ==========================================
 	Schema for inverted table for both body and title page schema:
 		key	: wordId (type: uint32)
-		value	: map of DocId to list of position (type: map[uint16][]uint32)
+		value	: map of DocId to list of positions (type: map[uint16][]uint32)
 	Schema for forward table forw[0]:
 		key	: word (type: string)
 		value	: wordId (type: uint32)
@@ -153,9 +153,9 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType ...string)(k
                         if !ok { return _, _, ErrKeyTypeNotMatch }
                 */
 		case "url.URL":
-                        tempKey, ok := k.(url.URL)
+                        tempKey, ok := k.(*url.URL)
                         if !ok { return nil, nil, ErrKeyTypeNotMatch }
-			key, err = tempKey.MarshalBinary()
+			key, err = (*tempKey).MarshalBinary()
 		default:
 			return nil, nil, ErrKeyTypeNotFound
 		}
@@ -211,15 +211,19 @@ func checkUnmarshal (v []byte, valType string)(val interface{}, err error) {
 		if err != nil { return nil, err }
 		return tempVal, nil
 	case "uint16":
-		var tempVal uint16
-		err = json.Unmarshal(v, &tempVal)
+		var tempStr string
+		err = json.Unmarshal(v, &tempStr)
+		if err != nil { return nil, err}
+		tempVal, err := strconv.Atoi(tempStr)
 		if err != nil { return nil, err }
-		return tempVal, nil
+		return uint16(tempVal), nil
 	case "uint32":
-		var tempVal uint32
-		err = json.Unmarshal(v, &tempVal)
+		var tempStr string
+		err = json.Unmarshal(v, &tempStr)
+		if err != nil { return nil, err}
+		tempVal, err := strconv.Atoi(tempStr)
 		if err != nil { return nil, err }
-		return tempVal, nil
+		return uint32(tempVal), nil
 	case "map[uint16][]uint32":
 		var tempVal = make(map[uint16][]uint32)
 		err = json.Unmarshal(v, &tempVal)

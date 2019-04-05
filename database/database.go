@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 	"strconv"
+	
+	"net/url"
 )
 
 const (
@@ -101,50 +103,58 @@ type (
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
-	base_dir := "../db_data/"
+	base_dir := "./db_data/"
 	
 	// table loading mode
 	// default is MemoryMap, 1 is LoadToRAM (most optimised), 2 is FileIO (all disk)
 	temp := 1
 
 	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement	
-	inverted := map[string][]string{
-		"invKeyword_body/": []string{strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
-		"invKeyword_title/": []string{strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
+	inverted := [][]string{
+		[]string{"invKeyword_body/", strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
+		[]string{"invKeyword_title/", strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
 	}
 
-	forward := map[string][]string{
-		"Word_wordId/": []string{strconv.Itoa(temp), "string", "uint32"}, 
-		"WordId_word/": []string{strconv.Itoa(temp), "uint32", "string"}, 
-		"URL_docId/": []string{strconv.Itoa(temp), "url.URL", "uint16"},
-		"DocId_docInfo/": []string{strconv.Itoa(temp), "uint16", "DocInfo"},
-		"Indexes/": []string{strconv.Itoa(temp), "string", "uint16"},
+	forward := [][]string{
+		[]string{"Word_wordId/", strconv.Itoa(temp), "string", "uint32"}, 
+		[]string{"WordId_word/", strconv.Itoa(temp), "uint32", "string"}, 
+		[]string{"URL_docId/", strconv.Itoa(temp), "url.URL", "uint16"},
+		[]string{"DocId_docInfo/", strconv.Itoa(temp), "uint16", "DocInfo"},
+		[]string{"Indexes/", strconv.Itoa(temp), "string", "uint16"},
 	}
 
 	// create directory if not exist
-	for d, _ := range inverted {
-		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
-			os.MkdirAll(base_dir+d, 0755)
+	for _, d := range inverted {
+		if _, err := os.Stat(base_dir + d[0]); os.IsNotExist(err) {
+			os.MkdirAll(base_dir+d[0], 0755)
 		}
 	}
 
-	for d, _ := range forward {
-		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
-			os.MkdirAll(base_dir+d, 0755)
+	for _, d := range forward {
+		if _, err := os.Stat(base_dir + d[0]); os.IsNotExist(err) {
+			os.MkdirAll(base_dir+d[0], 0755)
 		}
 	}
 
 	// initiate table object
-	for k, v := range inverted {
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, temp, v[1], v[2])
+	for _, v := range inverted {
+		tempMethod, err := strconv.Atoi(v[1])
+		if err != nil {
+			return nil, nil, err
+		}
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
 		if err != nil {
 			return nil, nil, err
 		}
 		inv = append(inv, temp)
 	}
 
-	for k, v := range forward {
-		temp, err := NewBadgerDB(ctx, base_dir+k, logger, temp, v[1], v[2])
+	for _, v := range forward {
+		tempMethod, err := strconv.Atoi(v[1])
+		if err != nil {
+			return nil, nil, err
+		}
+		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -223,12 +233,15 @@ func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}, appendedValue interface{}) error {
 	if _, _, err := checkMarshal(key, bdb_i.keyType, appendedValue, bdb_i.valType); err != nil { 
-	return err 
+		fmt.Println("APPEND VALUE TROUBLESOME", err)
+		return err 
 	}
 	
 	// value has type of map[uint16][]uint32
 	value, err := bdb_i.Get(ctx, key)
-	if err != nil {	return err }
+	if err != nil {	
+		return err 
+	}
 
 	// append the appendedValue into 
 	for k, v := range appendedValue.(map[uint16][]uint32) {
@@ -275,7 +288,9 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 		return nil, err
 	}
 	
+
 	value_, err = checkUnmarshal(value, bdb.valType)
+	fmt.Println("getter err is : ", err)
 	if err != nil {
 		return nil, err
 	} 
@@ -286,7 +301,10 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 
 func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface{}) error {
 	key, value, err := checkMarshal(key_, bdb.keyType, value_, bdb.valType)
-	if err != nil { return err }
+	if err != nil { 
+		fmt.Println("error in setting is ", err)
+		return err 
+	}
 
 	fmt.Println("setting ", string(key), string(value))
 	err = bdb.db.Update(func(txn *badger.Txn) error {
@@ -304,7 +322,9 @@ func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface
 
 func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err error) {
 	key, _, err := checkMarshal(key_, bdb.keyType, nil)
-	if err != nil { return false, err }
+	if err != nil { 
+		return false, err 
+	}
 
 	_, err = bdb.Get(ctx, key)
 	switch err {
@@ -319,7 +339,9 @@ func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err er
 
 func (bdb *BadgerDB) Delete(ctx context.Context, key_ interface{}) error {
 	key, _, err := checkMarshal(key_, bdb.keyType, nil)
-	if err != nil { return err }
+	if err != nil { 
+		return err
+	}
 
 	err = bdb.db.Update(func(txn *badger.Txn) error {
 		err := txn.Delete(key)
@@ -427,11 +449,11 @@ func main() {
 		defer db.Close(ctx, cancel)
 	}
 
-	a := "word"
-	b := uint32(1)
+	b := uint16(1)
 	//c := uint32(2)
 	//d := "word1"
 	
+	/*
 	forw[0].Set(ctx, a, b)
 	val, _ := forw[0].Get(ctx, a)
 	fmt.Println("DEBUG: get functionality expected 1; ", val)
@@ -442,10 +464,59 @@ func main() {
 	forw[0].Delete(ctx, a)
 	fmt.Println("DEBUG: forw[0] expected nothing")
 	forw[0].Debug_Print(ctx)
-
+	
+	fmt.Println("BEGINNING forw[1] test")
 	forw[1].Set(ctx, b, a)
 	fmt.Println("\nDEBUG: forw[1] expected 1; word")
 	forw[1].Debug_Print(ctx)
 	val, _ = forw[1].Get(ctx, b)
 	fmt.Println("DEBUG: get functionality expected word; ", val)
+	*/
+	fmt.Println("\nBEGINNING forw[2] test")
+	ur, _ := url.Parse("https://www.google.com")
+	forw[2].Set(ctx, ur, b)
+	fmt.Println("DEBUG: expecting google; 1")
+	forw[2].Debug_Print(ctx)
+	val, _ := forw[2].Get(ctx, ur)
+	fmt.Println("DEBUG: get functionality expecting google; ", val)
+
+	forw[2].Delete(ctx, ur)
+	fmt.Println("DEBUG: expecting nothing")
+	forw[2].Debug_Print(ctx)
+
+	fmt.Println("\nBEGINNING forw[3] test")
+	asss := make(map[uint32]uint32)
+	asss[5]=5
+	asss[8]=8
+	a := DocInfo{ *ur, []string{"asd","sd"}, time.Now(), 1, []uint16{10,11}, []uint16{100,101}, asss,} 
+
+	forw[3].Set(ctx, b, a)
+	fmt.Println("DEBUG: expecting docid to docinfo")
+	forw[3].Debug_Print(ctx)
+	valis, _ := forw[3].Get(ctx, b)
+	fmt.Println("DEBUG: getter func expecting docinfo ", valis)
+	forw[3].Delete(ctx, b)
+	fmt.Println("Expecting nothin")
+	forw[3].Debug_Print(ctx)
+	
+	fmt.Println("\n\nBEGINNING inv test")
+	m := make(map[uint16][]uint32)
+	m[1] = []uint32{10,11,12}
+	m[2] = []uint32{21,22,23}
+	
+	n := make(map[uint16][]uint32)
+	n[3] = []uint32{31,32,33}
+
+	inv[1].Set(ctx, uint32(b), m)
+	fmt.Println("DEBUG: expecting 1 and 2 for vals")
+	inv[1].Debug_Print(ctx)
+	inv[1].AppendValue(ctx, uint32(b), n)
+	fmt.Println("DEBUG: expecting 1 2 3 for vals")
+	inv[1].Debug_Print(ctx)
+
+	va, _ := inv[1].Get(ctx, uint32(b))
+	fmt.Println("DEBUG: get func expect 1 2 3 ", va)
+	inv[1].Delete(ctx, uint32(b))
+	fmt.Println("DEBUG: expect nothin")
+	inv[1].Debug_Print(ctx)
 }
