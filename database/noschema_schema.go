@@ -1,4 +1,4 @@
-package database
+package main
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 =============================== SCHEMA DEFINITION ==========================================
 	Schema for inverted table for both body and title page schema:
 		key	: wordId (type: uint32)
-		value	: list of InvKeyword_value, where each contain the DocId and positions fo the word (type: InvKeyword_values, see InvKeyword_value)
+		value	: map of DocId to list of position (type: map[uint16][]uint32)
 	Schema for forward table forw[0]:
 		key	: word (type: string)
 		value	: wordId (type: uint32)
@@ -42,15 +42,6 @@ import (
 		err := tempUrl.UnmarshalBinary(byteArray)
 */
 
-// Each item in the a value of inverted table contains the DocId (type: uint16) and list of position of the word location in the document
-type InvKeyword_value struct {
-	DocId uint16   `json:"DocId"`
-	Pos   []uint32 `json:"Pos"` // list of position of the word occuring in the document DocId
-}
-
-// InvKeyword_values contains slice of InvKeyword_value to support append operation
-type InvKeyword_values []InvKeyword_value
-
 // NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
@@ -64,6 +55,7 @@ type DocInfo struct {
 	//mapping for wordId to wordFrequency
 }
 
+// override json.Marshal to support marshalling of DocInfo type
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
 		Url           string            `json:"Url"`
@@ -78,6 +70,7 @@ func (u DocInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(basicDocInfo)
 }
 
+// override json.Unmarshal to uspport unmarshalling of DocInfo type
 func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	var rawStrings map[string]interface{}
 
@@ -132,24 +125,22 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 
 // helper function for type checking and conversion to support schema enforcement 
 // @return array of bytes, error
-func checkMarshal(k interface{}, kType string, v interface{}, vType string)(key []byte, v []byte, err error) { 
-        if kType != nil {
+func checkMarshal(k interface{}, kType string, v interface{}, vType ...string)(key []byte, val []byte, err error) { 
+	err = nil
+        if kType != "" {
                 switch kType {
                 case "string":
                         tempKey, ok := k.(string)
                         if !ok { return nil, nil, ErrKeyTypeNotMatch }
-			key, er := json.Marshal(tempKey)
-			if er != nil { return nil, nil, er }
+			key, err = json.Marshal(tempKey)
                 case "uint16":
                         tempKey, ok := k.(uint16)
                         if !ok { return nil, nil, ErrKeyTypeNotMatch }
-			key, er := json.Marshal(strconv.Itoa(int(tempKey)))
-			if er != nil { return nil, nil, er }
+			key, err = json.Marshal(strconv.Itoa(int(tempKey)))
                 case "uint32":
                         tempKey, ok := k.(uint32)
                         if !ok { return nil, nil, ErrKeyTypeNotMatch }
-			key, er := json.Marshal(strconv.Itoa(int(tempKey)))
-			if er != nil { return nil, nil, er }
+			key, err = json.Marshal(strconv.Itoa(int(tempKey)))
 		/*
                 case "InvKeyword_values":
                         tempKey, ok := k.(InvKeyword_values)
@@ -164,8 +155,7 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string)(key 
 		case "url.URL":
                         tempKey, ok := k.(url.URL)
                         if !ok { return nil, nil, ErrKeyTypeNotMatch }
-			key, er := tempKey.MarshalBinary()
-			if er != nil { return nil, nil, er }
+			key, err = tempKey.MarshalBinary()
 		default:
 			return nil, nil, ErrKeyTypeNotFound
 		}
@@ -173,56 +163,74 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string)(key 
 		key = nil 
 	}
 
+	if err != nil { return nil, nil, ErrKeyTypeNotMatch }
+
         if vType != nil {
-                switch vType {
+                switch vType[0] {
                 case "string":
-                        tempVal, ok := k.(string)
+                        tempVal, ok := v.(string)
                         if !ok { return nil, nil, ErrValTypeNotMatch }
-			val, er := json.Marshal(tempKey)
-			if er != nil { return nil, nil, er }
+			val, err = json.Marshal(tempVal)
                 case "uint16":
-                        tempVal, ok := k.(uint16)
+                        tempVal, ok := v.(uint16)
                         if !ok { return nil, nil, ErrValTypeNotMatch }
-			val, er := json.Marshal(strconv.Itoa(int(tempKey)))
-			if er != nil { return nil, nil, er }
+			val, err = json.Marshal(strconv.Itoa(int(tempVal)))
                 case "uint32":
-                        tempVal, ok := k.(uint32)
+                        tempVal, ok := v.(uint32)
                         if !ok { return nil, nil, ErrValTypeNotMatch }
-			val, er := json.Marshal(strconv.Itoa(int(tempKey)))
-			if er != nil { return nil, nil, er }
-                case "InvKeyword_values":
-                        tempVal, ok := k.(InvKeyword_values)
+			val, err = json.Marshal(strconv.Itoa(int(tempVal)))
+                case "map[uint16][]uint32":
+                        tempVal, ok := v.(map[uint16][]uint32)
                         if !ok { return nil, nil, ErrValTypeNotMatch }
-			val, er := json.Marshal(tempKey)
-			if er != nil { return nil, nil, er }
-        	case "InvKeyword_value":
-			tempVal, ok := k.(InvKeyword_value)
-                        if !ok { return nil, nil, ErrValTypeNotMatch }
-			val, er := json.Marshal(tempKey)
-			if er != nil { return nil, nil, er }
+			val, err = json.Marshal(tempVal)
 	        case "DocInfo": 
-                        tempVal, ok := k.(DocInfo)
+                        tempVal, ok := v.(DocInfo)
                         if !ok { return nil, nil, ErrValTypeNotMatch }
-			val, er := json.Marshal(tempKey)
-			if er != nil { return nil, nil, er }
+			val, err = json.Marshal(tempVal)
                 /*
 		case "url.URL":
                         tempKey, ok := k.(url.URL)
                         if !ok { return _, _, ErrKeyTypeNotMatch }
 		*/
 		default:
-			return _, _, ErrValTypeNotFound
+			return nil, nil, ErrValTypeNotFound
 		}
 	} else { 
 		val = nil 
 	}
 
-	err = nil
 	return 
 }
 
-func checkUnmarshal (v []byte, valType string)(v interface{}, err error) {
+// helper function for type checking and conversion to support schema enforcement 
+func checkUnmarshal (v []byte, valType string)(val interface{}, err error) {
 	switch valType {
 	case "string":
-		tempVal
+		var tempVal string
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil { return nil, err }
+		return tempVal, nil
+	case "uint16":
+		var tempVal uint16
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil { return nil, err }
+		return tempVal, nil
+	case "uint32":
+		var tempVal uint32
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil { return nil, err }
+		return tempVal, nil
+	case "map[uint16][]uint32":
+		var tempVal = make(map[uint16][]uint32)
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil { return nil, err }
+		return tempVal, nil
+	case "DocInfo":
+		var tempVal DocInfo
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil { return nil, err }
+		return tempVal, nil
+	default:
+		return nil, ErrValTypeNotFound
+	}
 }
