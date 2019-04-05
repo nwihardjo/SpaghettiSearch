@@ -62,6 +62,10 @@ type (
 		// data is in random , due to concurrency
 		Iterate(ctx context.Context) (*collector, error)
 
+		// batch write api to minimise the creation of transaction
+		//BatchSet(ctx context.Context, key []byte, keyType string, value []byte, valueType string) error
+
+		BatchWrite_init(ctx context.Context) *badger.WriteBatch
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
 	}
@@ -88,33 +92,37 @@ type (
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
-	inverted_dir := map[string]bool{"invKeyword_body/": false, "invKeyword_title/": false}
-	forward_dir := map[string]bool{"Word_wordId/": false, "WordId_word": true, "URL_docId/": true, "DocId_docInfo/": true, "Indexes/": true}
+	temp := 2
+
+	inverted_dirs := []string{"invKeyword_body/", "invKeyword_title/"}
+	inverted_modes := []int{temp, temp}
+	forward_dirs := []string{"Word_wordId/", "WordId_word", "URL_docId/", "DocId_docInfo/", "Indexes/"}
+	forward_modes := []int{temp, temp, temp, temp, temp}
 
 	// create directory if not exist
-	for d, _ := range inverted_dir {
+	for _, d := range inverted_dirs {
 		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
 			os.MkdirAll(base_dir+d, 0755)
 		}
 	}
 
-	for d, _ := range forward_dir {
+	for _, d := range forward_dirs {
 		if _, err := os.Stat(base_dir + d); os.IsNotExist(err) {
 			os.MkdirAll(base_dir+d, 0755)
 		}
 	}
 
 	// initiate table object
-	for k, v := range inverted_dir {
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+k, logger, v)
+	for i, v := range inverted_dirs {
+		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v, logger, inverted_modes[i])
 		if err != nil {
 			return nil, nil, err
 		}
 		inv = append(inv, temp)
 	}
 
-	for k, v := range forward_dir {
-		temp, err := NewBadgerDB(ctx, base_dir+k, logger, v)
+	for i, v := range forward_dirs {
+		temp, err := NewBadgerDB(ctx, base_dir+v, logger, forward_modes[i])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -124,13 +132,26 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	return inv, forw, nil
 }
 
-func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM bool) (DB_Inverted, error) {
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
+	return bdb.db.NewWriteBatch()
+}
+
+func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB_Inverted, error) {
 	opts := badger.DefaultOptions
-	if loadIntoRAM {
+	opts.Dir, opts.ValueDir = dir, dir
+
+	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
+	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
+	// 2 for store everything in disk, require extensive Disk
+	if loadIntoRAM == 1 {
 		// How should LSM tree be accessed
 		opts.TableLoadingMode = options.LoadToRAM
+	} else if loadIntoRAM == 2 {
+		opts.TableLoadingMode = options.FileIO
+		opts.ValueLogLoadingMode = options.FileIO
 	}
-	opts.Dir, opts.ValueDir = dir, dir
+
+	opts.SyncWrites = false
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
@@ -144,15 +165,23 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 	return bdb_i, nil
 }
 
-func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM bool) (DB, error) {
+func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB, error) {
 	opts := badger.DefaultOptions
-	if loadIntoRAM {
+	opts.Dir, opts.ValueDir = dir, dir
+
+	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
+	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
+	// 2 for store everything in disk, require extensive Disk
+	if loadIntoRAM == 1 {
 		// How should LSM tree be accessed
 		opts.TableLoadingMode = options.LoadToRAM
+	} else if loadIntoRAM == 2 {
+		opts.TableLoadingMode = options.FileIO
+		opts.ValueLogLoadingMode = options.FileIO
 	}
+
 	// set SyncWrites to False for performance increase but may cause loss of data
-	opts.SyncWrites = true
-	opts.Dir, opts.ValueDir = dir, dir
+	opts.SyncWrites = false
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
