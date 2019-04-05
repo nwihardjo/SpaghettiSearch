@@ -1,12 +1,12 @@
 package main
 
 import (
-	"the-SearchEngine/database"
-	"fmt"
-	"time"
 	"context"
-	"github.com/apsdehal/go-logger"
 	"crypto/md5"
+	"fmt"
+	"github.com/apsdehal/go-logger"
+	"the-SearchEngine/database"
+	"time"
 )
 
 func main() {

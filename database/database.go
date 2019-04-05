@@ -132,7 +132,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	return inv, forw, nil
 }
 
-func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch {
 	return bdb.db.NewWriteBatch()
 }
 
@@ -141,7 +141,7 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 	opts.Dir, opts.ValueDir = dir, dir
 
 	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
-	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
+	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM
 	// 2 for store everything in disk, require extensive Disk
 	if loadIntoRAM == 1 {
 		// How should LSM tree be accessed
@@ -170,7 +170,7 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadInt
 	opts.Dir, opts.ValueDir = dir, dir
 
 	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
-	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
+	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM
 	// 2 for store everything in disk, require extensive Disk
 	if loadIntoRAM == 1 {
 		// How should LSM tree be accessed

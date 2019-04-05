@@ -1,14 +1,14 @@
 package main
 
 import (
-	"os"
-	"fmt"
-	"encoding/json"
-	"the-SearchEngine/database"
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/apsdehal/go-logger"
+	"os"
 	"strconv"
 	"strings"
+	"the-SearchEngine/database"
 	"time"
 )
 

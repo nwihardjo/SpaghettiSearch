@@ -284,9 +284,9 @@ func Index(doc []byte, urlString string,
 		batchDB_inv = append(batchDB_inv, temp_)
 		defer temp_.Cancel()
 	}
-	for _, forwPointer := range forward { 
+	for _, forwPointer := range forward {
 		temp_ := forwPointer.BatchWrite_init(ctx)
-		batchDB_frw = append(batchDB_frw, temp_) 
+		batchDB_frw = append(batchDB_frw, temp_)
 		defer temp_.Cancel()
 	}
 
@@ -303,7 +303,6 @@ func Index(doc []byte, urlString string,
 		panic(err)
 	}
 
-
 	for word, _ := range posTitle {
 		// save from title wordID -> [{DocID, Pos}]
 		setInverted(ctx, word, posTitle, docID, forward, inverted[0], batchDB_frw, batchDB_inv[0], &nWID)
@@ -313,12 +312,12 @@ func Index(doc []byte, urlString string,
 		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv[1], &nWID)
 	}
 
-	for _, f := range batchDB_frw{
+	for _, f := range batchDB_frw {
 		f.Flush()
 	}
-	for _, i := range batchDB_inv{
+	for _, i := range batchDB_inv {
 		i.Flush()
-	} 
+	}
 	var kids []uint16
 	// get the URL mapping of each child
 	var abatchDB_inv []*badger.WriteBatch
@@ -328,9 +327,9 @@ func Index(doc []byte, urlString string,
 		abatchDB_inv = append(abatchDB_inv, temp_)
 		defer temp_.Cancel()
 	}
-	for _, forwPointer := range forward { 
+	for _, forwPointer := range forward {
 		temp_ := forwPointer.BatchWrite_init(ctx)
-		abatchDB_frw = append(abatchDB_frw, temp_) 
+		abatchDB_frw = append(abatchDB_frw, temp_)
 		defer temp_.Cancel()
 	}
 	nextDocIDBytes, err = forward[4].Get(ctx, []byte("nextDocID"))
@@ -378,7 +377,7 @@ func Index(doc []byte, urlString string,
 			// child is not inserted into URL->DocID
 			nDID := strconv.Itoa(nextDocID)
 			abatchDB_frw[2].Set(mChildURL, []byte(nDID), 0)
-			abatchDB_frw[3].Set([]byte(nDID), docInfoBytes,0)
+			abatchDB_frw[3].Set([]byte(nDID), docInfoBytes, 0)
 			// set childID
 			childIDBytes = []byte(nDID)
 			// update nextDocID
