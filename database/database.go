@@ -137,7 +137,7 @@ func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
 func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB_Inverted, error) {
 	opts := badger.DefaultOptions
 	opts.Dir, opts.ValueDir = dir, dir
-	
+
 	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
 	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
 	// 2 for store everything in disk, require extensive Disk
@@ -149,7 +149,7 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 		opts.ValueLogLoadingMode = options.FileIO
 	}
 
-	opts.SyncWrites = true
+	opts.SyncWrites = false
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
@@ -166,7 +166,7 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadIntoRAM int) (DB, error) {
 	opts := badger.DefaultOptions
 	opts.Dir, opts.ValueDir = dir, dir
-	
+
 	// 0 is the default options, which uses MemoryMap for both TableLoadingMode and ValueLogLoadingMode, already defined on DefaultOptions
 	// 1 is LoadToRam on TableLoadingMode, the most optimised. ValueLoadingMode can't be load into RAM  
 	// 2 for store everything in disk, require extensive Disk
@@ -179,7 +179,7 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadInt
 	}
 
 	// set SyncWrites to False for performance increase but may cause loss of data
-	opts.SyncWrites = true
+	opts.SyncWrites = false
 
 	badgerDB, err := badger.Open(opts)
 	if err != nil {
