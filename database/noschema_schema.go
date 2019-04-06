@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"fmt"
-	"reflect"
+	//"reflect"
 )
 
 /*
@@ -128,7 +128,7 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 
 // helper function for type checking and conversion to support schema enforcement 
 // @return array of bytes, error
-func checkMarshal(k interface{}, kType string, v interface{}, vType ...string)(key []byte, val []byte, err error) { 
+func checkMarshal(k interface{}, kType string, v interface{}, vType string)(key []byte, val []byte, err error) { 
 	err = nil
         if kType != "" {
                 switch kType {
@@ -168,8 +168,9 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType ...string)(k
 
 	if err != nil { return nil, nil, ErrKeyTypeNotMatch }
 
-        if vType != nil {
-                switch vType[0] {
+	fmt.Println("DEBUG: vtype yall ", vType)
+        if vType != "" {
+                switch vType {
                 case "string":
                         tempVal, ok := v.(string)
                         if !ok { return nil, nil, ErrValTypeNotMatch }
@@ -202,6 +203,7 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType ...string)(k
 		val = nil 
 	}
 
+	fmt.Println("setting", string(key), "and value", val)
 	return 
 }
 
@@ -214,18 +216,18 @@ func checkUnmarshal (v []byte, valType string)(val interface{}, err error) {
 		if err != nil { return nil, err }
 		return tempVal, nil
 	case "uint16":
-		var tempStr uint16
+		var tempStr string 
 		err = json.Unmarshal(v, &tempStr)
 		if err != nil { 
-			fmt.Println("BBBBB", reflect.TypeOf(v))
-			fmt.Println("from unmarshalling uint16", err)
+			//fmt.Println("BBBBB", reflect.TypeOf(v))
+			//fmt.Println("from unmarshalling uint16", err)
 			return nil, err
 		}
-		fmt.Println("apparently it passed")
-		//tempVal, err := strconv.Atoi(string(v))
+		//fmt.Println("apparently it passed")
+		tempVal, err := strconv.Atoi(tempStr)
 		//fmt.Println("error from unmarshaller", tempVal, err)
-		//if err != nil { return nil, err }
-		return uint16(tempStr), nil
+		if err != nil { return nil, err }
+		return uint16(tempVal), nil
 	case "uint32":
 		var tempStr string
 		err = json.Unmarshal(v, &tempStr)

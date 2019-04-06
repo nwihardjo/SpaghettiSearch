@@ -99,7 +99,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 		}
 		// update latest wordID
 		*nWID += 1
-		if err = batchDB_forw[4].Set([]byte("nextWordID"), []byte(strconv.Itoa(int(*nWID)+1)), 0); err != nil {
+		if err = batchDB_forw[4].Set([]byte("nextWordID"), []byte(strconv.Itoa(int(*nWID))), 0); err != nil {
 			panic(err)
 		}
 	} else if err != nil {
@@ -210,7 +210,6 @@ func Index(doc []byte, urlString string,
 	nextDocID_, errNext := forward[4].Get(ctx, "nextDocID")
 	if errNext == badger.ErrKeyNotFound {
 		// masukkin 0 as nextDocID
-		// fmt.Println("initialize next DocID")
 		nextDocID = 0 
 		err = forward[4].Set(ctx, "nextDocID", nextDocID)
 		if err != nil {
@@ -236,6 +235,8 @@ func Index(doc []byte, urlString string,
 			panic (err)
 		}
 		nextDocID += 1
+	} else if err != nil {
+		panic(err)
 	} else { 
 		// when the docID is found on database
 		docID = docID_.(uint16) 
@@ -310,14 +311,16 @@ func Index(doc []byte, urlString string,
 	for word, _ := range posBody {
 		// save from body wordID-> [{DocID, Pos}]
 		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv[1], &nWID)
-	
+	}	
 
 	// write the data into database
 	for _, f := range batchDB_frw {
 		f.Flush()
+		f.Cancel()
 	}
 	for _, i := range batchDB_inv {
 		i.Flush()
+		i.Cancel()
 	}
 
 	// initialise batch writer for children url
@@ -360,7 +363,7 @@ func Index(doc []byte, urlString string,
 		var childID uint16
 		childID_, err := forward[2].Get(ctx, childURL)
 		if err == badger.ErrKeyNotFound {
-			docInfoC := database.DocInfo{ *childURL, nil, time.Now(), 0, nil, []uint16{uint16(docID)}, nil, }
+			docInfoC := database.DocInfo{*childURL, nil, time.Now(), 0, nil, []uint16{uint16(docID)}, nil, }
 			docInfoBytes, err := json.Marshal(docInfoC)
 			if err != nil {
 				panic(err)
@@ -405,6 +408,7 @@ func Index(doc []byte, urlString string,
 		panic(err)
 	}
 
+	forward[0].Debug_Print(ctx)
 	// parse title
 	pageTitle := strings.Fields(title)
 	var pageSize int
@@ -419,10 +423,13 @@ func Index(doc []byte, urlString string,
 
 	// get the word mapping (wordId -> frequency) of each document
 	wordMapping := make(map[uint32]uint32)
+	i := 0
 	for word, val := range freqBody {
+		i += 1
+		fmt.Println("DEBUG: loop through", i)
 		wordID, err := forward[0].Get(ctx, word)
 		if err != nil {
-			fmt.Println("DEBUG: ", word, "not present in db")
+			fmt.Println("DEBUG:", word, "not present in db")
 			panic(err)
 		}
 		wordMapping[wordID.(uint32)] = val
@@ -431,13 +438,13 @@ func Index(doc []byte, urlString string,
 	// initialise document object
 	var pageInfo database.DocInfo
 	if parentURL == "" {
-		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping,}
 	} else {
 		parentID, err := forward[2].Get(ctx, parentURL)
 		if err != nil {
 			panic(err)
 		}
-		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []uint16{parentID.(uint16)}, wordMapping}
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []uint16{parentID.(uint16)}, wordMapping,}
 	}
 
 	// insert into forward 3
@@ -455,5 +462,4 @@ func Index(doc []byte, urlString string,
 	if err = ioutil.WriteFile(docsDir+strconv.Itoa(int(docID)), doc, 0644); err != nil {
 		panic(err)
 	}
-}
 }

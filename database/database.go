@@ -222,7 +222,7 @@ func getOpts(loadMethod int, dir string)(opts badger.Options){
 		case 2:
 			opts.TableLoadingMode, opts.ValueLogLoadingMode = options.FileIO, options.FileIO
 	}
-	return		
+	return opts
 }
 
 
@@ -263,7 +263,7 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}
 func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interface{}, err error){
 	// key and value has type of []byte, for the passing to transactions
 	var value []byte
-	key, _, err := checkMarshal(key_, bdb.keyType, fmt.Println)
+	key, _, err := checkMarshal(key_, bdb.keyType, nil, "")
 	if err != nil {
 		fmt.Println("error from get ", err)
 		return nil, err
@@ -273,6 +273,7 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 		item, err := txn.Get(key)
 
 		if err != nil {
+			//fmt.Println("DEBUGDEBUG: from really inside ", string(key))
 			return err
 		}
 
@@ -289,13 +290,13 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 	})
 
 	if err != nil {
+		// fmt.Println("DEBUG: error from the inside", err)
 		return nil, err
 	}
 	
 	value_, err = checkUnmarshal(value, bdb.valType)
 	if err != nil {
-		fmt.Println("AAAAAAA", reflect.TypeOf(value))
-		fmt.Println("error from unmarshalling yo")
+		fmt.Println("DEBUG: error after unmarshalling ", reflect.TypeOf(value))
 		return nil, err
 	} 
 
@@ -322,7 +323,7 @@ func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface
 
 
 func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err error) {
-	_, _, err = checkMarshal(key_, bdb.keyType, nil)
+	_, _, err = checkMarshal(key_, bdb.keyType, nil, "")
 	if err != nil { 
 		return false, err 
 	}
@@ -339,7 +340,7 @@ func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err er
 
 
 func (bdb *BadgerDB) Delete(ctx context.Context, key_ interface{}) error {
-	key, _, err := checkMarshal(key_, bdb.keyType, nil)
+	key, _, err := checkMarshal(key_, bdb.keyType, nil, "")
 	if err != nil { 
 		return err
 	}
