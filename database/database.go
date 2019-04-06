@@ -12,7 +12,8 @@ import (
 	"time"
 	"strconv"
 	
-	"net/url"
+	//"net/url"
+	"reflect"
 )
 
 const (
@@ -120,7 +121,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 		[]string{"WordId_word/", strconv.Itoa(temp), "uint32", "string"}, 
 		[]string{"URL_docId/", strconv.Itoa(temp), "url.URL", "uint16"},
 		[]string{"DocId_docInfo/", strconv.Itoa(temp), "uint16", "DocInfo"},
-		[]string{"Indexes/", strconv.Itoa(temp), "string", "uint16"},
+		[]string{"Indexes/", strconv.Itoa(temp), "string", "uint32"},
 	}
 
 	// create directory if not exist
@@ -138,10 +139,12 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 
 	// initiate table object
 	for _, v := range inverted {
+		// get the table loading method first
 		tempMethod, err := strconv.Atoi(v[1])
 		if err != nil {
 			return nil, nil, err
 		}
+
 		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
 		if err != nil {
 			return nil, nil, err
@@ -150,10 +153,12 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	}
 
 	for _, v := range forward {
+		// get the table loading method first
 		tempMethod, err := strconv.Atoi(v[1])
 		if err != nil {
 			return nil, nil, err
 		}
+
 		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
 		if err != nil {
 			return nil, nil, err
@@ -258,8 +263,9 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}
 func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interface{}, err error){
 	// key and value has type of []byte, for the passing to transactions
 	var value []byte
-	key, _, err := checkMarshal(key_, bdb.keyType, nil)
+	key, _, err := checkMarshal(key_, bdb.keyType, fmt.Println)
 	if err != nil {
+		fmt.Println("error from get ", err)
 		return nil, err
 	}
 
@@ -286,10 +292,10 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 		return nil, err
 	}
 	
-
 	value_, err = checkUnmarshal(value, bdb.valType)
-	fmt.Println("getter err is : ", err)
 	if err != nil {
+		fmt.Println("AAAAAAA", reflect.TypeOf(value))
+		fmt.Println("error from unmarshalling yo")
 		return nil, err
 	} 
 
@@ -303,7 +309,6 @@ func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface
 		return err 
 	}
 
-	fmt.Println("setting ", string(key), string(value))
 	err = bdb.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, value)
 	})
@@ -317,19 +322,19 @@ func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface
 
 
 func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err error) {
-	key, _, err := checkMarshal(key_, bdb.keyType, nil)
+	_, _, err = checkMarshal(key_, bdb.keyType, nil)
 	if err != nil { 
 		return false, err 
 	}
 
-	_, err = bdb.Get(ctx, key)
+	_, err = bdb.Get(ctx, key_)
 	switch err {
 	case badger.ErrKeyNotFound:
-		ok, err = false, nil
+		return false, nil
 	case nil:
-		ok, err = true, nil
+		return true, nil
 	}
-	return
+	return 
 }
 
 

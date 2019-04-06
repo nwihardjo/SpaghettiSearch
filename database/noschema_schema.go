@@ -6,6 +6,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"fmt"
+	"reflect"
 )
 
 /*
@@ -211,12 +214,18 @@ func checkUnmarshal (v []byte, valType string)(val interface{}, err error) {
 		if err != nil { return nil, err }
 		return tempVal, nil
 	case "uint16":
-		var tempStr string
+		var tempStr uint16
 		err = json.Unmarshal(v, &tempStr)
-		if err != nil { return nil, err}
-		tempVal, err := strconv.Atoi(tempStr)
-		if err != nil { return nil, err }
-		return uint16(tempVal), nil
+		if err != nil { 
+			fmt.Println("BBBBB", reflect.TypeOf(v))
+			fmt.Println("from unmarshalling uint16", err)
+			return nil, err
+		}
+		fmt.Println("apparently it passed")
+		//tempVal, err := strconv.Atoi(string(v))
+		//fmt.Println("error from unmarshaller", tempVal, err)
+		//if err != nil { return nil, err }
+		return uint16(tempStr), nil
 	case "uint32":
 		var tempStr string
 		err = json.Unmarshal(v, &tempStr)
