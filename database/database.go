@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"context"
@@ -233,7 +233,6 @@ func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}, appendedValue interface{}) error {
 	if _, _, err := checkMarshal(key, bdb_i.keyType, appendedValue, bdb_i.valType); err != nil { 
-		fmt.Println("APPEND VALUE TROUBLESOME", err)
 		return err 
 	}
 	
@@ -260,7 +259,6 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 	// key and value has type of []byte, for the passing to transactions
 	var value []byte
 	key, _, err := checkMarshal(key_, bdb.keyType, nil)
-	fmt.Println("getter key: ", string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -302,13 +300,11 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface{}) error {
 	key, value, err := checkMarshal(key_, bdb.keyType, value_, bdb.valType)
 	if err != nil { 
-		fmt.Println("error in setting is ", err)
 		return err 
 	}
 
 	fmt.Println("setting ", string(key), string(value))
 	err = bdb.db.Update(func(txn *badger.Txn) error {
-		fmt.Println("setting ", string(key), string(value))
 		return txn.Set(key, value)
 	})
 
@@ -434,6 +430,7 @@ func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
 	return err
 }
 
+/*
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	logg, _ := logger.New("test", 1)
@@ -471,7 +468,7 @@ func main() {
 	forw[1].Debug_Print(ctx)
 	val, _ = forw[1].Get(ctx, b)
 	fmt.Println("DEBUG: get functionality expected word; ", val)
-	*/
+
 	fmt.Println("\nBEGINNING forw[2] test")
 	ur, _ := url.Parse("https://www.google.com")
 	forw[2].Set(ctx, ur, b)
@@ -519,4 +516,4 @@ func main() {
 	inv[1].Delete(ctx, uint32(b))
 	fmt.Println("DEBUG: expect nothin")
 	inv[1].Debug_Print(ctx)
-}
+}*/
