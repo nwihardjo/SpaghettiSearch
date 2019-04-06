@@ -6,11 +6,11 @@ import (
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
-	"github.com/pkg/errors"
 	bpb "github.com/dgraph-io/badger/pb"
+	"github.com/pkg/errors"
 	"os"
-	"time"
 	"strconv"
+	"time"
 )
 
 const (
@@ -23,13 +23,13 @@ const (
 var (
 	// BadgerAlertNamespace defines the alerts BadgerDB namespace
 	BadgerAlertNamespace = []byte("alerts")
-	
+
 	ErrKeyTypeNotMatch = errors.New("Invalid key type, key type must match with the schema defined! Refer to database.go or noschema_schema.go for schema documentation.")
-	
+
 	ErrValTypeNotMatch = errors.New("Invalid value type, value type must follows with the schema defined! Refer to database.go or noschema_schema.go for schema documentation.")
 
 	ErrKeyTypeNotFound = errors.New("Key type not found, double check the type variable passed")
-	
+
 	ErrValTypeNotFound = errors.New("Value type not found, double check the type variable passed")
 )
 
@@ -58,7 +58,7 @@ type (
 		Set(ctx context.Context, key interface{}, value interface{}) error
 
 		// return nil if key not found
-		Has(ctx context.Context, key interface{})(bool, error)
+		Has(ctx context.Context, key interface{}) (bool, error)
 
 		Delete(ctx context.Context, key interface{}) error
 
@@ -79,10 +79,10 @@ type (
 	}
 
 	BadgerDB struct {
-		db     *badger.DB
-		logger *logger.Logger
-		keyType	string
-		valType	string
+		db      *badger.DB
+		logger  *logger.Logger
+		keyType string
+		valType string
 	}
 )
 
@@ -102,20 +102,20 @@ type (
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
 	base_dir := "./db_data/"
-	
+
 	// table loading mode
 	// default is MemoryMap, 1 is LoadToRAM (most optimised), 2 is FileIO (all disk)
 	temp := 1
 
-	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement	
+	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement
 	inverted := [][]string{
 		[]string{"invKeyword_body/", strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
 		[]string{"invKeyword_title/", strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
 	}
 
 	forward := [][]string{
-		[]string{"Word_wordId/", strconv.Itoa(temp), "string", "uint32"}, 
-		[]string{"WordId_word/", strconv.Itoa(temp), "uint32", "string"}, 
+		[]string{"Word_wordId/", strconv.Itoa(temp), "string", "uint32"},
+		[]string{"WordId_word/", strconv.Itoa(temp), "uint32", "string"},
 		[]string{"URL_docId/", strconv.Itoa(temp), "url.URL", "uint16"},
 		[]string{"DocId_docInfo/", strconv.Itoa(temp), "uint16", "DocInfo"},
 		[]string{"Indexes/", strconv.Itoa(temp), "string", "uint32"},
@@ -166,7 +166,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	return inv, forw, nil
 }
 
-
 func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB_Inverted, error) {
 	opts := getOpts(loadMethod, dir)
 
@@ -175,13 +174,12 @@ func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger
 		return nil, err
 	}
 
-	bdb_i := &BadgerDB_Inverted{BadgerDB{badgerDB, logger, keyType, valType,}}
+	bdb_i := &BadgerDB_Inverted{BadgerDB{badgerDB, logger, keyType, valType}}
 
 	// run garbage collection in advance
 	go bdb_i.runGC(ctx)
 	return bdb_i, nil
 }
-
 
 func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB, error) {
 	opts := getOpts(loadMethod, dir)
@@ -192,8 +190,8 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMet
 	}
 
 	bdb := &BadgerDB{
-		db:     badgerDB,
-		logger: logger,
+		db:      badgerDB,
+		logger:  logger,
 		keyType: keyType,
 		valType: valType,
 	}
@@ -203,9 +201,8 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMet
 	return bdb, nil
 }
 
-
 // helper function for ease of DB configurations tuning
-func getOpts(loadMethod int, dir string)(opts badger.Options){
+func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	opts = badger.DefaultOptions
 	opts.Dir, opts.ValueDir = dir, dir
 
@@ -214,37 +211,34 @@ func getOpts(loadMethod int, dir string)(opts badger.Options){
 
 	// loadMethod: default is MemoryMap, 1 for loading to memory (LoadToRAM), 2 for storing all into disk (FileIO) which resulted in extensive disk IO
 	switch loadMethod {
-		case 1: 
-			opts.TableLoadingMode = options.LoadToRAM
-		case 2:
-			opts.TableLoadingMode, opts.ValueLogLoadingMode = options.FileIO, options.FileIO
+	case 1:
+		opts.TableLoadingMode = options.LoadToRAM
+	case 2:
+		opts.TableLoadingMode, opts.ValueLogLoadingMode = options.FileIO, options.FileIO
 	}
 	return opts
 }
 
-
-func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch{
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch {
 	return bdb.db.NewWriteBatch()
 }
-
 
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 	return bdb.db.DropAll()
 }
 
-
 func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}, appendedValue interface{}) error {
-	if _, _, err := checkMarshal(key, bdb_i.keyType, appendedValue, bdb_i.valType); err != nil { 
-		return err 
+	if _, _, err := checkMarshal(key, bdb_i.keyType, appendedValue, bdb_i.valType); err != nil {
+		return err
 	}
-	
+
 	// value has type of map[uint16][]uint32
 	value, err := bdb_i.Get(ctx, key)
-	if err != nil {	
-		return err 
+	if err != nil {
+		return err
 	}
 
-	// append the appendedValue into 
+	// append the appendedValue into
 	for k, v := range appendedValue.(map[uint16][]uint32) {
 		value.(map[uint16][]uint32)[k] = v
 	}
@@ -256,8 +250,7 @@ func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}
 	return nil
 }
 
-
-func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interface{}, err error){
+func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interface{}, err error) {
 	// key and value has type of []byte, for the passing to transactions
 	var value []byte
 	key, _, err := checkMarshal(key_, bdb.keyType, nil, "")
@@ -288,20 +281,19 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 	if err != nil {
 		return nil, err
 	}
-	
+
 	value_, err = checkUnmarshal(value, bdb.valType)
 	if err != nil {
 		return nil, err
-	} 
+	}
 
 	return
 }
 
-
 func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface{}) error {
 	key, value, err := checkMarshal(key_, bdb.keyType, value_, bdb.valType)
-	if err != nil { 
-		return err 
+	if err != nil {
+		return err
 	}
 
 	err = bdb.db.Update(func(txn *badger.Txn) error {
@@ -315,11 +307,10 @@ func (bdb *BadgerDB) Set(ctx context.Context, key_ interface{}, value_ interface
 	return nil
 }
 
-
 func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err error) {
 	_, _, err = checkMarshal(key_, bdb.keyType, nil, "")
-	if err != nil { 
-		return false, err 
+	if err != nil {
+		return false, err
 	}
 
 	_, err = bdb.Get(ctx, key_)
@@ -329,13 +320,12 @@ func (bdb *BadgerDB) Has(ctx context.Context, key_ interface{}) (ok bool, err er
 	case nil:
 		return true, nil
 	}
-	return 
+	return
 }
-
 
 func (bdb *BadgerDB) Delete(ctx context.Context, key_ interface{}) error {
 	key, _, err := checkMarshal(key_, bdb.keyType, nil, "")
-	if err != nil { 
+	if err != nil {
 		return err
 	}
 
@@ -350,13 +340,11 @@ func (bdb *BadgerDB) Delete(ctx context.Context, key_ interface{}) error {
 	return err
 }
 
-
 func (bdb *BadgerDB) Close(ctx context.Context, cancel context.CancelFunc) error {
 	// perform cancellation of the running process using context
 	cancel()
 	return bdb.db.Close()
 }
-
 
 func (bdb *BadgerDB) runGC(ctx context.Context) {
 	ticker := time.NewTicker(badgerGCInterval)
@@ -377,17 +365,14 @@ func (bdb *BadgerDB) runGC(ctx context.Context) {
 	}
 }
 
-
 type collector struct {
 	KV []*bpb.KV
 }
-
 
 func (c *collector) Send(list *bpb.KVList) error {
 	c.KV = append(c.KV, list.Kv...)
 	return nil
 }
-
 
 func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	stream := bdb.db.NewStream()
@@ -405,7 +390,6 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
 	}
 	return c, nil
 }
-
 
 func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
 	err := bdb.db.View(func(txn *badger.Txn) error {

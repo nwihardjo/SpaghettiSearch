@@ -17,7 +17,6 @@ import (
 	"sync"
 	"the-SearchEngine/database"
 	"time"
-
 )
 
 var docsDir = "docs/"
@@ -86,7 +85,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	if err == badger.ErrKeyNotFound {
 		// use nextWordID if not found
 		wordIDbyte := []byte(strconv.Itoa(int(*nWID)))
-		wordID = *nWID 
+		wordID = *nWID
 
 		// batch writer accepts array of byte only, conversion to []byte is needed
 		// forw[0] save word -> wordId
@@ -104,8 +103,8 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 		}
 	} else if err != nil {
 		panic(err)
-	} else { 
-		wordID = wordID_.(uint32) 
+	} else {
+		wordID = wordID_.(uint32)
 	}
 
 	// append the added entry (docId and pos) to inverted file
@@ -114,7 +113,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	if err == badger.ErrKeyNotFound {
 		// there's no entry on the inverted table for the corresponding wordid
 		if err = batchDB_inv.Set([]byte(strconv.Itoa(int(wordID))), mInvVals, 0); err != nil {
-			panic(err) 
+			panic(err)
 		}
 	} else if err != nil {
 		panic(err)
@@ -123,7 +122,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 		for k, v := range invKeyVal {
 			value.(map[uint16][]uint32)[k] = v
 		}
-		
+
 		// need to convert it back to []byte for batch writer
 		tempVal, err := json.Marshal(value)
 		if err != nil {
@@ -217,7 +216,7 @@ func Index(doc []byte, urlString string,
 	nextDocID_, errNext := forward[4].Get(ctx, "nextDocID")
 	if errNext == badger.ErrKeyNotFound {
 		// masukkin 0 as nextDocID
-		nextDocID = 0 
+		nextDocID = 0
 		err = forward[4].Set(ctx, "nextDocID", nextDocID)
 		if err != nil {
 			panic(err)
@@ -236,17 +235,17 @@ func Index(doc []byte, urlString string,
 		docID = uint16(nextDocID)
 		// add this doc to forw[2]
 		if err = forward[2].Set(ctx, URL, docID); err != nil {
-			panic (err)
+			panic(err)
 		}
 		if err = forward[4].Set(ctx, "nextDocID", nextDocID+1); err != nil {
-			panic (err)
+			panic(err)
 		}
 		nextDocID += 1
 	} else if err != nil {
 		panic(err)
-	} else { 
+	} else {
 		// when the docID is found on database
-		docID = docID_.(uint16) 
+		docID = docID_.(uint16)
 	}
 
 	//Tokenize document
@@ -305,8 +304,8 @@ func Index(doc []byte, urlString string,
 		forward[4].Set(ctx, "nextWordID", nWID)
 	} else if errNext_ != nil {
 		panic(errNext_)
-	} else { 
-		nWID = nWID_.(uint32) 
+	} else {
+		nWID = nWID_.(uint32)
 	}
 
 	// process and load data to batch writer for inverted tables
@@ -318,7 +317,7 @@ func Index(doc []byte, urlString string,
 	for word, _ := range posBody {
 		// save from body wordID-> [{DocID, Pos}]
 		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv[1], &nWID)
-	}	
+	}
 
 	// write the data into database
 	for _, f := range batchDB_frw {
@@ -356,18 +355,18 @@ func Index(doc []byte, urlString string,
 		if err != nil {
 			panic(err)
 		}
-	
+
 		// batch writer require []byte to be passed
 		mChildURL, errMarshal := childURL.MarshalBinary()
 		if errMarshal != nil {
 			panic(errMarshal)
 		}
-	
+
 		// get document id corresponding to the child, make one if not present
 		var childID uint16
 		childID_, err := forward[2].Get(ctx, childURL)
 		if err == badger.ErrKeyNotFound {
-			docInfoC := database.DocInfo{*childURL, nil, time.Now(), 0, nil, []uint16{uint16(docID)}, nil, }
+			docInfoC := database.DocInfo{*childURL, nil, time.Now(), 0, nil, []uint16{uint16(docID)}, nil}
 			docInfoBytes, err := json.Marshal(docInfoC)
 			if err != nil {
 				panic(err)
@@ -391,8 +390,8 @@ func Index(doc []byte, urlString string,
 			nextDocID += 1
 		} else if err != nil {
 			panic(err)
-		} else { 
-			childID = childID_.(uint16) 
+		} else {
+			childID = childID_.(uint16)
 		}
 
 		kids = append(kids, childID)
@@ -427,11 +426,11 @@ func Index(doc []byte, urlString string,
 		}
 		wordMapping[wordID.(uint32)] = val
 	}
-	
+
 	// initialise document object
 	var pageInfo database.DocInfo
 	if parentURL == "" {
-		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping,}
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
 	} else {
 		parentURL_, err := url.Parse(parentURL)
 		if err != nil {
@@ -442,11 +441,11 @@ func Index(doc []byte, urlString string,
 		if err != nil {
 			panic(err)
 		}
-		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []uint16{parentID.(uint16)}, wordMapping,}
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []uint16{parentID.(uint16)}, wordMapping}
 	}
 
 	// insert into forward 3
-	
+
 	if err = forward[3].Set(ctx, docID, pageInfo); err != nil {
 		panic(err)
 	}

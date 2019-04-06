@@ -123,100 +123,124 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 	return nil
 }
 
-// helper function for type checking and conversion to support schema enforcement 
+// helper function for type checking and conversion to support schema enforcement
 // uses string approach for primitive data type to be converted to []byte
 // uses json marshal function for complex / struct to be converted to []byte
 // @return array of bytes, error
-func checkMarshal(k interface{}, kType string, v interface{}, vType string)(key []byte, val []byte, err error) { 
+func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key []byte, val []byte, err error) {
 	err = nil
 
 	// check the key type
-        if kType != "" {
-                switch kType {
-                case "string":
-                        tempKey, ok := k.(string)
-                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+	if kType != "" {
+		switch kType {
+		case "string":
+			tempKey, ok := k.(string)
+			if !ok {
+				return nil, nil, ErrKeyTypeNotMatch
+			}
 			key = []byte(tempKey)
-                case "uint16":
-                        tempKey, ok := k.(uint16)
-                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+		case "uint16":
+			tempKey, ok := k.(uint16)
+			if !ok {
+				return nil, nil, ErrKeyTypeNotMatch
+			}
 			key = []byte(strconv.Itoa(int(tempKey)))
-                case "uint32":
-                        tempKey, ok := k.(uint32)
-                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+		case "uint32":
+			tempKey, ok := k.(uint32)
+			if !ok {
+				return nil, nil, ErrKeyTypeNotMatch
+			}
 			key = []byte(strconv.Itoa(int(tempKey)))
 		case "url.URL":
-                        tempKey, ok := k.(*url.URL)
-                        if !ok { return nil, nil, ErrKeyTypeNotMatch }
+			tempKey, ok := k.(*url.URL)
+			if !ok {
+				return nil, nil, ErrKeyTypeNotMatch
+			}
 			key, err = (*tempKey).MarshalBinary()
 		default:
 			return nil, nil, ErrKeyTypeNotFound
 		}
-	} else { 
-		key = nil 
+	} else {
+		key = nil
 	}
 
 	// don't need to check the value type if the key does not matched
-	if err != nil { return nil, nil, ErrKeyTypeNotMatch }
+	if err != nil {
+		return nil, nil, ErrKeyTypeNotMatch
+	}
 
-        if vType != "" {
-                switch vType {
-                case "string":
-                        tempVal, ok := v.(string)
-                        if !ok { return nil, nil, ErrValTypeNotMatch }
+	if vType != "" {
+		switch vType {
+		case "string":
+			tempVal, ok := v.(string)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
 			val = []byte(tempVal)
-                case "uint16":
-                        tempVal, ok := v.(uint16)
-                        if !ok { return nil, nil, ErrValTypeNotMatch }
+		case "uint16":
+			tempVal, ok := v.(uint16)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
 			val = []byte(strconv.Itoa(int(tempVal)))
-                case "uint32":
-                        tempVal, ok := v.(uint32)
-                        if !ok { return nil, nil, ErrValTypeNotMatch }
+		case "uint32":
+			tempVal, ok := v.(uint32)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
 			val = []byte(strconv.Itoa(int(tempVal)))
-                case "map[uint16][]uint32":
-                        tempVal, ok := v.(map[uint16][]uint32)
-                        if !ok { return nil, nil, ErrValTypeNotMatch }
+		case "map[uint16][]uint32":
+			tempVal, ok := v.(map[uint16][]uint32)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
 			val, err = json.Marshal(tempVal)
-	        case "DocInfo": 
-                        tempVal, ok := v.(DocInfo)
-                        if !ok { return nil, nil, ErrValTypeNotMatch }
+		case "DocInfo":
+			tempVal, ok := v.(DocInfo)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
 			val, err = json.Marshal(tempVal)
 		default:
 			return nil, nil, ErrValTypeNotFound
 		}
-	} else { 
-		val = nil 
+	} else {
+		val = nil
 	}
 
-	return 
+	return
 }
 
-// helper function for type checking and conversion to support schema enforcement 
-func checkUnmarshal (v []byte, valType string)(val interface{}, err error) {
+// helper function for type checking and conversion to support schema enforcement
+func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 	switch valType {
 	case "string":
 		return string(v), nil
 	case "uint16":
 		tempVal, err := strconv.Atoi(string(v))
-		if err != nil { 
+		if err != nil {
 			return nil, err
 		}
 		return uint16(tempVal), nil
 	case "uint32":
 		tempVal, err := strconv.Atoi(string(v))
-		if err != nil { 
+		if err != nil {
 			return nil, err
 		}
 		return uint32(tempVal), nil
 	case "map[uint16][]uint32":
 		var tempVal = make(map[uint16][]uint32)
 		err = json.Unmarshal(v, &tempVal)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		return tempVal, nil
 	case "DocInfo":
 		var tempVal DocInfo
 		err = json.Unmarshal(v, &tempVal)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		return tempVal, nil
 	default:
 		return nil, ErrValTypeNotFound
