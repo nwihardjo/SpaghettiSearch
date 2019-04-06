@@ -101,6 +101,7 @@ func main() {
 			stored in the database and that the parents
 			URL are already mapped to some doc id
 		*/
+		wgIndexer.Wait()
 		for cURL, parents := range parentsToBeAdded {
 			wgIndexer.Add(1)
 			go indexer.AddParent(cURL, parents, forw, &wgIndexer)
@@ -109,6 +110,7 @@ func main() {
 		/* If finished with current depth level, proceed to the next level */
 		if nextDepthSize == 0 {
 
+			// Maybe also sync DB per level???
 			depth += 1
 			nextDepthSize += queue.Len()
 			fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
