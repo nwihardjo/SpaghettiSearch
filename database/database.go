@@ -11,9 +11,6 @@ import (
 	"os"
 	"time"
 	"strconv"
-	
-	//"net/url"
-	"reflect"
 )
 
 const (
@@ -212,8 +209,8 @@ func getOpts(loadMethod int, dir string)(opts badger.Options){
 	opts = badger.DefaultOptions
 	opts.Dir, opts.ValueDir = dir, dir
 
-	// SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
-	// opts.SyncWrites = true
+	// if false, SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
+	opts.SyncWrites = true
 
 	// loadMethod: default is MemoryMap, 1 for loading to memory (LoadToRAM), 2 for storing all into disk (FileIO) which resulted in extensive disk IO
 	switch loadMethod {
@@ -273,7 +270,6 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 		item, err := txn.Get(key)
 
 		if err != nil {
-			//fmt.Println("DEBUGDEBUG: from really inside ", string(key))
 			return err
 		}
 
@@ -290,13 +286,11 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 	})
 
 	if err != nil {
-		// fmt.Println("DEBUG: error from the inside", err)
 		return nil, err
 	}
 	
 	value_, err = checkUnmarshal(value, bdb.valType)
 	if err != nil {
-		fmt.Println("DEBUG: error after unmarshalling ", reflect.TypeOf(value))
 		return nil, err
 	} 
 
@@ -435,91 +429,3 @@ func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
 	})
 	return err
 }
-
-/*
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	logg, _ := logger.New("test", 1)
-		
-	inv, forw, err := DB_init(ctx, logg) 
-	if err != nil {
-		panic (err)
-	}
-	for _, db := range inv{
-		defer db.Close(ctx, cancel)
-	}
-	for _, db := range forw{
-		defer db.Close(ctx, cancel)
-	}
-
-	b := uint16(1)
-	//c := uint32(2)
-	//d := "word1"
-	
-	/*
-	forw[0].Set(ctx, a, b)
-	val, _ := forw[0].Get(ctx, a)
-	fmt.Println("DEBUG: get functionality expected 1; ", val)
-	fmt.Println("DEBUG: forw[0] expected word; 1")
-	forw[0].Debug_Print(ctx)
-	temp, _ := forw[0].Has(ctx, a)
-	fmt.Println("DEBUG: has functionality expected temp; ", temp)
-	forw[0].Delete(ctx, a)
-	fmt.Println("DEBUG: forw[0] expected nothing")
-	forw[0].Debug_Print(ctx)
-	
-	fmt.Println("BEGINNING forw[1] test")
-	forw[1].Set(ctx, b, a)
-	fmt.Println("\nDEBUG: forw[1] expected 1; word")
-	forw[1].Debug_Print(ctx)
-	val, _ = forw[1].Get(ctx, b)
-	fmt.Println("DEBUG: get functionality expected word; ", val)
-
-	fmt.Println("\nBEGINNING forw[2] test")
-	ur, _ := url.Parse("https://www.google.com")
-	forw[2].Set(ctx, ur, b)
-	fmt.Println("DEBUG: expecting google; 1")
-	forw[2].Debug_Print(ctx)
-	val, _ := forw[2].Get(ctx, ur)
-	fmt.Println("DEBUG: get functionality expecting google; ", val)
-
-	forw[2].Delete(ctx, ur)
-	fmt.Println("DEBUG: expecting nothing")
-	forw[2].Debug_Print(ctx)
-
-	fmt.Println("\nBEGINNING forw[3] test")
-	asss := make(map[uint32]uint32)
-	asss[5]=5
-	asss[8]=8
-	a := DocInfo{ *ur, []string{"asd","sd"}, time.Now(), 1, []uint16{10,11}, []uint16{100,101}, asss,} 
-
-	forw[3].Set(ctx, b, a)
-	fmt.Println("DEBUG: expecting docid to docinfo")
-	forw[3].Debug_Print(ctx)
-	valis, _ := forw[3].Get(ctx, b)
-	fmt.Println("DEBUG: getter func expecting docinfo ", valis)
-	forw[3].Delete(ctx, b)
-	fmt.Println("Expecting nothin")
-	forw[3].Debug_Print(ctx)
-	
-	fmt.Println("\n\nBEGINNING inv test")
-	m := make(map[uint16][]uint32)
-	m[1] = []uint32{10,11,12}
-	m[2] = []uint32{21,22,23}
-	
-	n := make(map[uint16][]uint32)
-	n[3] = []uint32{31,32,33}
-
-	inv[1].Set(ctx, uint32(b), m)
-	fmt.Println("DEBUG: expecting 1 and 2 for vals")
-	inv[1].Debug_Print(ctx)
-	inv[1].AppendValue(ctx, uint32(b), n)
-	fmt.Println("DEBUG: expecting 1 2 3 for vals")
-	inv[1].Debug_Print(ctx)
-
-	va, _ := inv[1].Get(ctx, uint32(b))
-	fmt.Println("DEBUG: get func expect 1 2 3 ", va)
-	inv[1].Delete(ctx, uint32(b))
-	fmt.Println("DEBUG: expect nothin")
-	inv[1].Debug_Print(ctx)
-}*/

@@ -139,44 +139,51 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 	return
 }
 
-func AddParent(currentURL string, parents []string,
+func AddParent(currentURL_ string, parents []string,
 	forw []database.DB, wgIndexer *sync.WaitGroup) {
 
 	defer wgIndexer.Done()
-
 	ctx, _ := context.WithCancel(context.TODO())
 
+	currentURL, err := url.Parse(currentURL_)
+	if err != nil {
+		panic(err)
+	}
+
+	// get the equivalent docID from db
 	docId, err := forw[2].Get(ctx, currentURL)
 	if err != nil {
 		panic(err)
 	}
+
+	// get existing docInfo corresponding to the current url
+	var tempdocinfo database.DocInfo
 	tempdocinfoB, err := forw[3].Get(ctx, docId)
 	if err != nil {
 		panic(err)
 	}
-	//var temp database.DocInfo
-	//err = temp.UnmarshalJSON(tempdocinfoB)
-	//if err != nil {
-	//	panic(err)
-	//}
-	tempdocinfo := tempdocinfoB.(database.DocInfo)
+	tempdocinfo = tempdocinfoB.(database.DocInfo)
+
+	// append the parents to the docInfo
 	for _, pURL := range parents {
-		docIdP_, err := forw[2].Get(ctx, pURL)
+		tempURL, err := url.Parse(pURL)
 		if err != nil {
 			panic(err)
 		}
-		docIdP := docIdP_.(uint16)
-		//docIdP, err := strconv.Atoi(string(docIdPB))
-		//if err != nil {
-		//	panic(err)
-		//}
+
+		// retrieve the docId of the parents
+		var docIdP uint16
+		docIdP_, err := forw[2].Get(ctx, tempURL)
+		if err != nil {
+			panic(err)
+		}
+		docIdP = docIdP_.(uint16)
+
 		tempdocinfo.Parents = append(tempdocinfo.Parents, docIdP)
 	}
-	//newDocInfoBytes, err := temp.MarshalJSON()
-	//if err != nil {
-	//	panic(err)
-	//}
-	err = forw[3].Set(ctx, docId, tempdocinfoB)
+
+	// add back the docInfo with appended parents
+	err = forw[3].Set(ctx, docId, tempdocinfo)
 	if err != nil {
 		panic(err)
 	}
@@ -316,11 +323,9 @@ func Index(doc []byte, urlString string,
 	// write the data into database
 	for _, f := range batchDB_frw {
 		f.Flush()
-		f.Cancel()
 	}
 	for _, i := range batchDB_inv {
 		i.Flush()
-		i.Cancel()
 	}
 
 	// initialise batch writer for children url
@@ -347,7 +352,6 @@ func Index(doc []byte, urlString string,
 	// get the docID of each child
 	var kids []uint16
 	for _, child := range children {
-		// fmt.Println(child)
 		childURL, err := url.Parse(child)
 		if err != nil {
 			panic(err)
@@ -396,19 +400,12 @@ func Index(doc []byte, urlString string,
 
 	// load the child data into the db
 	if err = abatchDB_frw[2].Flush(); err != nil {
-		fmt.Println(err)
-		panic(err)
-	}
-	if err = abatchDB_frw[3].Flush(); err != nil {
-		fmt.Println(err)
 		panic(err)
 	}
 	if err = abatchDB_frw[4].Flush(); err != nil {
-		fmt.Println(err)
 		panic(err)
 	}
 
-	forward[0].Debug_Print(ctx)
 	// parse title
 	pageTitle := strings.Fields(title)
 	var pageSize int
@@ -423,13 +420,9 @@ func Index(doc []byte, urlString string,
 
 	// get the word mapping (wordId -> frequency) of each document
 	wordMapping := make(map[uint32]uint32)
-	i := 0
 	for word, val := range freqBody {
-		i += 1
-		fmt.Println("DEBUG: loop through", i)
 		wordID, err := forward[0].Get(ctx, word)
 		if err != nil {
-			fmt.Println("DEBUG:", word, "not present in db")
 			panic(err)
 		}
 		wordMapping[wordID.(uint32)] = val
@@ -440,7 +433,12 @@ func Index(doc []byte, urlString string,
 	if parentURL == "" {
 		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping,}
 	} else {
-		parentID, err := forward[2].Get(ctx, parentURL)
+		parentURL_, err := url.Parse(parentURL)
+		if err != nil {
+			panic(err)
+		}
+		// get parentURL from db which should be in the db ald
+		parentID, err := forward[2].Get(ctx, parentURL_)
 		if err != nil {
 			panic(err)
 		}
