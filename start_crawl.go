@@ -3,14 +3,11 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"the-SearchEngine/crawler"
 	"the-SearchEngine/database"
@@ -104,6 +101,7 @@ func main() {
 			stored in the database and that the parents
 			URL are already mapped to some doc id
 		*/
+		wgIndexer.Wait()
 		for cURL, parents := range parentsToBeAdded {
 			wgIndexer.Add(1)
 			go indexer.AddParent(cURL, parents, forw, &wgIndexer)
@@ -112,6 +110,7 @@ func main() {
 		/* If finished with current depth level, proceed to the next level */
 		if nextDepthSize == 0 {
 
+			// Maybe also sync DB per level???
 			depth += 1
 			nextDepthSize += queue.Len()
 			fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
@@ -128,75 +127,4 @@ func main() {
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
-
-	//Output into a file
-	f, err := os.Create("./spider_result.txt")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	// Load all data containing DocInfo --> URL
-	fin_dat, err := forw[3].Iterate(ctx)
-	var final_data []database.DocInfo
-	if err != nil {
-		panic(err)
-	}
-	for _, kv := range fin_dat.KV {
-		var tempDocInfo database.DocInfo
-		err = json.Unmarshal(kv.Value, &tempDocInfo)
-		if err != nil {
-			panic(err)
-		}
-		// Remove unscraped data, present for the sake of printing out child url
-		if tempDocInfo.Page_size == 0 {
-			continue
-		}
-		final_data = append(final_data, tempDocInfo)
-	}
-
-	// Writing result into the file one data at each time
-	outputSeparator := "------------------------------------------------------------ \n"
-	for _, v := range final_data {
-		lineThree := []string{v.Mod_date.Format(time.RFC1123), strconv.Itoa(int(v.Page_size))}
-		// Iterate through the keywords and frequency
-		wordFreq := []string{}
-		for wordId, freq := range v.Words_mapping {
-			word, err := forw[1].Get(ctx, []byte(strconv.Itoa(int(wordId))))
-			if err != nil {
-				panic(err)
-			}
-			wordFreq = append(wordFreq, string(word)+" "+strconv.Itoa(int(freq)))
-		}
-
-		// Iterate through the children of the URL
-		childUrl := []string{}
-		for _, child := range v.Children {
-			var tempData database.DocInfo
-			byteDocInfo, err := forw[3].Get(ctx, []byte(strconv.Itoa(int(child))))
-			if err != nil {
-				panic(err)
-			}
-			err = json.Unmarshal(byteDocInfo, &tempData)
-			if err != nil {
-				panic(err)
-			}
-			childUrl = append(childUrl, "Child "+tempData.Url.String())
-		}
-
-		// Append all info for a document into a formatted string to be written
-		output := []string{strings.Join(v.Page_title, " "), v.Url.String(), strings.Join(lineThree, ", "), strings.Join(wordFreq, "; "), strings.Join(childUrl, " \n"), outputSeparator}
-		_, err := f.WriteString(strings.Join(output, " \n"))
-		if err != nil {
-			panic(err)
-		}
-		f.Sync()
-	}
-	fmt.Println("Finished writing spider_result.txt")
-
-	// word, err:=forw[1].Get(ctx, []byte(strconv.Itoa(9)))
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Println(string(word), word)
 }

@@ -284,9 +284,9 @@ func Index(doc []byte, urlString string,
 		batchDB_inv = append(batchDB_inv, temp_)
 		defer temp_.Cancel()
 	}
-	for _, forwPointer := range forward { 
+	for _, forwPointer := range forward {
 		temp_ := forwPointer.BatchWrite_init(ctx)
-		batchDB_frw = append(batchDB_frw, temp_) 
+		batchDB_frw = append(batchDB_frw, temp_)
 		defer temp_.Cancel()
 	}
 
@@ -303,7 +303,6 @@ func Index(doc []byte, urlString string,
 		panic(err)
 	}
 
-
 	for word, _ := range posTitle {
 		// save from title wordID -> [{DocID, Pos}]
 		setInverted(ctx, word, posTitle, docID, forward, inverted[0], batchDB_frw, batchDB_inv[0], &nWID)
@@ -313,64 +312,99 @@ func Index(doc []byte, urlString string,
 		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv[1], &nWID)
 	}
 
-	for _, f := range batchDB_frw{
+	for _, f := range batchDB_frw {
 		f.Flush()
 	}
-	for _, i := range batchDB_inv{
+	for _, i := range batchDB_inv {
 		i.Flush()
-	} 
+	}
 	var kids []uint16
 	// get the URL mapping of each child
-	if children != nil {
-		for _, child := range children {
-			// fmt.Println(child)
-			childURL, err := url.Parse(child)
-			if err != nil {
-				panic(err)
-			}
-			mChildURL, errMarshal := childURL.MarshalBinary()
-			if errMarshal != nil {
-				panic(errMarshal)
-			}
-			childIDBytes, err := forward[2].Get(ctx, mChildURL)
-			if err == badger.ErrKeyNotFound {
-				// get the next doc ID
-				nextDocIDBytes, errNext := forward[4].Get(ctx, []byte("nextDocID"))
-				if errNext != nil {
-					panic(errNext)
-				}
-				nextDocID, err := strconv.Atoi(string(nextDocIDBytes))
-				if err != nil {
-					panic(err)
-				}
-				docInfoC := database.DocInfo{
-					*childURL,
-					nil,
-					time.Now(),
-					0,
-					nil,
-					[]uint16{uint16(docID)},
-					nil,
-				}
-				docInfoBytes, err := json.Marshal(docInfoC)
-				if err != nil {
-					panic(err)
-				}
-				// child is not inserted into URL->DocID
-				forward[2].Set(ctx, mChildURL, nextDocIDBytes)
-				forward[3].Set(ctx, nextDocIDBytes, docInfoBytes)
-				// set childID
-				childIDBytes = nextDocIDBytes
-				// update nextDocID
-				forward[4].Set(ctx, []byte("nextDocID"), []byte(strconv.Itoa(nextDocID+1)))
-			}
-			childID, err := strconv.Atoi(string(childIDBytes))
-			if err != nil {
-				panic(err)
-			}
-			// fmt.Println(childID)
-			kids = append(kids, uint16(childID))
+	var abatchDB_inv []*badger.WriteBatch
+	var abatchDB_frw []*badger.WriteBatch
+	for _, invPointer := range inverted {
+		temp_ := invPointer.BatchWrite_init(ctx)
+		abatchDB_inv = append(abatchDB_inv, temp_)
+		defer temp_.Cancel()
+	}
+	for _, forwPointer := range forward {
+		temp_ := forwPointer.BatchWrite_init(ctx)
+		abatchDB_frw = append(abatchDB_frw, temp_)
+		defer temp_.Cancel()
+	}
+	nextDocIDBytes, err = forward[4].Get(ctx, []byte("nextDocID"))
+	if err != nil {
+		panic(err)
+	}
+	nextDocID, err = strconv.Atoi(string(nextDocIDBytes))
+	if err != nil {
+		panic(err)
+	}
+	for _, child := range children {
+		// fmt.Println(child)
+		childURL, err := url.Parse(child)
+		if err != nil {
+			panic(err)
 		}
+		mChildURL, errMarshal := childURL.MarshalBinary()
+		if errMarshal != nil {
+			panic(errMarshal)
+		}
+		childIDBytes, err := forward[2].Get(ctx, mChildURL)
+		if err == badger.ErrKeyNotFound {
+			// get the next doc ID
+			// nextDocIDBytes, errNext := forward[4].Get(ctx, []byte("nextDocID"))
+			// if errNext != nil {
+			// 	panic(errNext)
+			// }
+			// nextDocID, err := strconv.Atoi(string(nDIDBytes))
+			// if err != nil {
+			// 	panic(err)
+			// }
+			docInfoC := database.DocInfo{
+				*childURL,
+				nil,
+				time.Now(),
+				0,
+				nil,
+				[]uint16{uint16(docID)},
+				nil,
+			}
+			docInfoBytes, err := json.Marshal(docInfoC)
+			if err != nil {
+				panic(err)
+			}
+			// child is not inserted into URL->DocID
+			nDID := strconv.Itoa(nextDocID)
+			abatchDB_frw[2].Set(mChildURL, []byte(nDID), 0)
+			abatchDB_frw[3].Set([]byte(nDID), docInfoBytes, 0)
+			// set childID
+			childIDBytes = []byte(nDID)
+			// update nextDocID
+			abatchDB_frw[4].Set([]byte("nextDocID"), []byte(strconv.Itoa(nextDocID+1)), 0)
+			nextDocID += 1
+		}
+		childID, err := strconv.Atoi(string(childIDBytes))
+		if err != nil {
+			panic(err)
+		}
+		// fmt.Println(childID)
+		kids = append(kids, uint16(childID))
+	}
+	err = abatchDB_frw[2].Flush()
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+	err = abatchDB_frw[3].Flush()
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+	err = abatchDB_frw[4].Flush()
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
 	}
 	// forw[2] save URL -> DocInfo
 	// URL to the marshalling stuff
@@ -398,7 +432,20 @@ func Index(doc []byte, urlString string,
 		}
 		wordMapping[uint32(wordID)] = freqBody[word]
 	}
-	pageInfo := database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
+	var pageInfo database.DocInfo
+	if parentURL == "" {
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
+	} else {
+		parentIDBytes, err := forward[2].Get(ctx, []byte(parentURL))
+		if err != nil {
+			panic(err)
+		}
+		parentID, err := strconv.Atoi(string(parentIDBytes))
+		if err != nil {
+			panic(err)
+		}
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []uint16{uint16(parentID)}, wordMapping}
+	}
 	// marshal pageInfo
 	mPageInfo, err := pageInfo.MarshalJSON()
 	if err != nil {
@@ -425,7 +472,7 @@ func Index(doc []byte, urlString string,
 	if _, err := os.Stat(docsDir); os.IsNotExist(err) {
 		os.Mkdir(docsDir, 0755)
 	}
-	err = ioutil.WriteFile(docsDir+strconv.Itoa(nextDocID), doc, 0644)
+	err = ioutil.WriteFile(docsDir+strconv.Itoa(docID), doc, 0644)
 	if err != nil {
 		panic(err)
 	}
