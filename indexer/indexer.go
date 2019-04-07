@@ -99,6 +99,10 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, docH
 		panic(err)
 	}
 
+	// START OF CRITICAL SECTION //
+	// LOCK //
+	mutex.Lock()
+
 	// append the added entry (docHash and pos) to inverted file
 	// value has type of map[DocHash][]uint32 (docHash -> list of position)
 	value, err := inverted.Get(ctx, wordHashString)
@@ -124,6 +128,10 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, docH
 			panic(err)
 		}
 	}
+
+	// END OF CRITICAL SECTION //
+	// UNLOCK //
+	mutex.Unlock()
 
 	return
 }
@@ -230,10 +238,6 @@ func Index(doc []byte, urlString string,
 		defer temp_.Cancel()
 	}
 
-	// START OF CRITICAL SECTION //
-	// LOCK //
-	mutex.Lock()
-
 	// process and load data to batch writer for inverted tables
 	// map word to wordHash as well if not exist
 	for word, _ := range posTitle {
@@ -244,10 +248,6 @@ func Index(doc []byte, urlString string,
 		// save from body wordHash-> [{DocHash, Positions}]
 		setInverted(ctx, word, posBody, docHashString, forward, inverted[1], batchDB_frw, batchDB_inv[1], mutex)
 	}
-
-	// END OF CRITICAL SECTION //
-	// UNLOCK //
-	mutex.Unlock()
 
 	// write the data into database
 	for _, f := range batchDB_frw {

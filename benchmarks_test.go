@@ -23,6 +23,24 @@ func BenchmarkMD5(b *testing.B) {
 	}
 }
 
+func BenchmarkGetWord(b *testing.B) {
+	word := "new_word"
+	hashedW := md5.Sum([]byte(word))
+	hashedWStr := hex.EncodeToString(hashedW[:])
+	err := frw[0].Set(ctx, hashedWStr, word)
+	if err != nil {
+		panic(err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err = frw[0].Get(ctx, hashedWStr)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func BenchmarkGet200Children200Words(b *testing.B) {
 	p := make([]byte, 16)
 	_, _ = rand.Read(p)
@@ -63,7 +81,7 @@ func BenchmarkGet200Children200Words(b *testing.B) {
 	}
 }
 
-func BenchmarkSet(b *testing.B) {
+func BenchmarkSetWord(b *testing.B) {
 	word := "new_word"
 	hashedW := md5.Sum([]byte(word))
 	hashedWStr := hex.EncodeToString(hashedW[:])
