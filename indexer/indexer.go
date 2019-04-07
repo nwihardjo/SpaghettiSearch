@@ -125,7 +125,6 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, docH
 		}
 	}
 
-
 	return
 }
 

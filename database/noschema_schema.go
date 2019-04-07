@@ -44,13 +44,13 @@ import (
 // NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	Url           url.URL			`json:"Url"`
-	Page_title    []string			`json:"Page_title"`
-	Mod_date      time.Time			`json:"Mod_date"`
-	Page_size     uint32			`json:"Page_size"`
-	Children      []string			`json:"Children"`
-	Parents       []string			`json:"Parents"`
-	Words_mapping map[string]uint32		`json:"Words_mapping"`
+	Url           url.URL           `json:"Url"`
+	Page_title    []string          `json:"Page_title"`
+	Mod_date      time.Time         `json:"Mod_date"`
+	Page_size     uint32            `json:"Page_size"`
+	Children      []string          `json:"Children"`
+	Parents       []string          `json:"Parents"`
+	Words_mapping map[string]uint32 `json:"Words_mapping"`
 	//mapping for wordHash to wordFrequency
 }
 
@@ -61,11 +61,11 @@ func (u DocInfo) MarshalJSON() ([]byte, error) {
 		Page_title    []string          `json:"Page_title"`
 		Mod_date      string            `json:"Mod_date"`
 		Page_size     uint32            `json:"Page_size"`
-		Children      []string		`json:"Children"`
-		Parents       []string		`json:"Parents"`
+		Children      []string          `json:"Children"`
+		Parents       []string          `json:"Parents"`
 		Words_mapping map[string]uint32 `json:"Words_mapping"`
 	}{u.Url.String(), u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size,
-	u.Children, u.Parents, u.Words_mapping}
+		u.Children, u.Parents, u.Words_mapping}
 
 	return json.Marshal(basicDocInfo)
 }
