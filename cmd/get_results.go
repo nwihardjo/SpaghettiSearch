@@ -1,19 +1,28 @@
 package main
 
 import (
+	/*
 	"context"
 	"encoding/json"
+	*/
 	"fmt"
-	"github.com/apsdehal/go-logger"
+	//"github.com/apsdehal/go-logger"
 	"os"
+	/*
 	"strconv"
 	"strings"
 	"the-SearchEngine/database"
 	"time"
+	*/
 )
 
 func main() {
 	// Init DB
+	fmt.Println("============= THIS FILE IS OUTDATED AND WILL NOT RUN PROPERLY ============")
+	fmt.Println("====== UPDATE THIS FILE FIRST TO INTEGRATE WITH THE NEW DB STRUCTURE =====")
+	fmt.Println("============================= RETURNING ==================================")
+	os.Exit(1)
+	/*
 	ctx, cancel := context.WithCancel(context.TODO())
 	log, _ := logger.New("test", 1)
 	inv, forw, _ := database.DB_init(ctx, log)
@@ -94,4 +103,5 @@ func main() {
 	// 	panic(err)
 	// }
 	// fmt.Println(string(word), word)
+	*/
 }
