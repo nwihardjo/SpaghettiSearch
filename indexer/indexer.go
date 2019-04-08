@@ -3,6 +3,8 @@ package indexer
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/dgraph-io/badger"
@@ -66,62 +68,54 @@ func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string
 	return
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, nextDocID uint16, forward []database.DB, inverted database.DB_Inverted,
-	batchDB_forw []*badger.WriteBatch, batchDB_inv *badger.WriteBatch, nWID *uint32) {
+func setInverted(ctx context.Context, word string, pos map[string][]uint32, docHash string, forward []database.DB, inverted database.DB_Inverted,
+	batchDB_forw []*badger.WriteBatch, batchDB_inv *badger.WriteBatch, mutex *sync.Mutex) {
 
 	// initialise inverted keywords values
-	invKeyVal := make(map[uint16][]uint32)
-	invKeyVal[uint16(nextDocID)] = pos[word]
+	invKeyVals := make(map[string][]uint32)
+	invKeyVals[docHash] = pos[word]
 
 	// make inverted keywords values into []byte for batch writer
-	mInvVals, err := json.Marshal(invKeyVal)
+	mInvVals, err := json.Marshal(invKeyVals)
 	if err != nil {
 		panic(err)
 	}
 
-	var wordID uint32
-	// get the word id if present in the db
-	wordID_, err := forward[0].Get(ctx, word)
-	if err == badger.ErrKeyNotFound {
-		// use nextWordID if not found
-		wordIDbyte := []byte(strconv.Itoa(int(*nWID)))
-		wordID = *nWID
+	// Compute the wordHash of current word
+	wordHash := md5.Sum([]byte(word))
+	wordHashString := hex.EncodeToString(wordHash[:])
 
+	// Check if current wordHash exist
+	_, err = forward[0].Get(ctx, wordHashString)
+
+	// If not exist, create one
+	if err == badger.ErrKeyNotFound {
 		// batch writer accepts array of byte only, conversion to []byte is needed
-		// forw[0] save word -> wordId
-		if err = batchDB_forw[0].Set([]byte(word), wordIDbyte, 0); err != nil {
-			panic(err)
-		}
-		// forw[1] save wordID -> word
-		if err = batchDB_forw[1].Set(wordIDbyte, []byte(word), 0); err != nil {
-			panic(err)
-		}
-		// update latest wordID
-		*nWID += 1
-		if err = batchDB_forw[4].Set([]byte("nextWordID"), []byte(strconv.Itoa(int(*nWID))), 0); err != nil {
+		// forw[1] save wordHash -> word
+		if err = batchDB_forw[0].Set([]byte(wordHashString), []byte(word), 0); err != nil {
 			panic(err)
 		}
 	} else if err != nil {
 		panic(err)
-	} else {
-		wordID = wordID_.(uint32)
 	}
 
-	// append the added entry (docId and pos) to inverted file
-	// value has type of map[uint16][]uint32 (docId -> list of position)
-	value, err := inverted.Get(ctx, wordID)
+	// START OF CRITICAL SECTION //
+	// LOCK //
+	mutex.Lock()
+
+	// append the added entry (docHash and pos) to inverted file
+	// value has type of map[DocHash][]uint32 (docHash -> list of position)
+	value, err := inverted.Get(ctx, wordHashString)
 	if err == badger.ErrKeyNotFound {
-		// there's no entry on the inverted table for the corresponding wordid
-		if err = batchDB_inv.Set([]byte(strconv.Itoa(int(wordID))), mInvVals, 0); err != nil {
+		// there's no entry on the inverted table for the corresponding wordHash
+		if err = batchDB_inv.Set([]byte(wordHashString), mInvVals, 0); err != nil {
 			panic(err)
 		}
 	} else if err != nil {
 		panic(err)
 	} else {
-		// append new docid entry to the existing one
-		for k, v := range invKeyVal {
-			value.(map[uint16][]uint32)[k] = v
-		}
+		// append new docHash entry to the existing one
+		value.(map[string][]uint32)[docHash] = append(value.(map[string][]uint32)[docHash], pos[word]...)
 
 		// need to convert it back to []byte for batch writer
 		tempVal, err := json.Marshal(value)
@@ -129,11 +123,15 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, next
 			panic(err)
 		}
 
-		// load new appended value of inverted table according to the wordid
-		if err = batchDB_inv.Set([]byte(strconv.Itoa(int(wordID))), tempVal, 0); err != nil {
+		// load new appended value of inverted table according to the wordHash
+		if err = batchDB_inv.Set([]byte(wordHashString), tempVal, 0); err != nil {
 			panic(err)
 		}
 	}
+
+	// END OF CRITICAL SECTION //
+	// UNLOCK //
+	mutex.Unlock()
 
 	return
 }
@@ -144,20 +142,11 @@ func AddParent(currentURL_ string, parents []string,
 	defer wgIndexer.Done()
 	ctx, _ := context.WithCancel(context.TODO())
 
-	currentURL, err := url.Parse(currentURL_)
-	if err != nil {
-		panic(err)
-	}
-
-	// get the equivalent docID from db
-	docId, err := forw[2].Get(ctx, currentURL)
-	if err != nil {
-		panic(err)
-	}
-
-	// get existing docInfo corresponding to the current url
+	// get existing docInfo corresponding to the current docHash
 	var tempdocinfo database.DocInfo
-	tempdocinfoB, err := forw[3].Get(ctx, docId)
+	docHash := md5.Sum([]byte(currentURL_))
+	docHashString := hex.EncodeToString(docHash[:])
+	tempdocinfoB, err := forw[1].Get(ctx, docHashString)
 	if err != nil {
 		panic(err)
 	}
@@ -165,25 +154,13 @@ func AddParent(currentURL_ string, parents []string,
 
 	// append the parents to the docInfo
 	for _, pURL := range parents {
-		tempURL, err := url.Parse(pURL)
-		if err != nil {
-			panic(err)
-		}
-
-		// retrieve the docId of the parents
-		var docIdP uint16
-		docIdP_, err := forw[2].Get(ctx, tempURL)
-		if err != nil {
-			panic(err)
-		}
-		docIdP = docIdP_.(uint16)
-
-		tempdocinfo.Parents = append(tempdocinfo.Parents, docIdP)
+		pHash := md5.Sum([]byte(pURL))
+		pHashString := hex.EncodeToString(pHash[:])
+		tempdocinfo.Parents = append(tempdocinfo.Parents, pHashString)
 	}
 
 	// add back the docInfo with appended parents
-	err = forw[3].Set(ctx, docId, tempdocinfo)
-	if err != nil {
+	if err = forw[1].Set(ctx, docHashString, tempdocinfo); err != nil {
 		panic(err)
 	}
 
@@ -208,45 +185,9 @@ func Index(doc []byte, urlString string,
 	}
 	fmt.Println("Indexing", URL.String())
 
-	//BEGIN LOCK//
-	mutex.Lock()
-
-	// check if nextDocID present in the database, set 0 if not
-	var nextDocID uint32
-	nextDocID_, errNext := forward[4].Get(ctx, "nextDocID")
-	if errNext == badger.ErrKeyNotFound {
-		// masukkin 0 as nextDocID
-		nextDocID = 0
-		err = forward[4].Set(ctx, "nextDocID", nextDocID)
-		if err != nil {
-			panic(err)
-		}
-	} else if errNext != nil {
-		panic(errNext)
-	} else {
-		nextDocID = nextDocID_.(uint32)
-	}
-
-	// check if current doc has an ID
-	var docID uint16
-	docID_, err := forward[2].Get(ctx, URL)
-	if err == badger.ErrKeyNotFound {
-		// set docID
-		docID = uint16(nextDocID)
-		// add this doc to forw[2]
-		if err = forward[2].Set(ctx, URL, docID); err != nil {
-			panic(err)
-		}
-		if err = forward[4].Set(ctx, "nextDocID", nextDocID+1); err != nil {
-			panic(err)
-		}
-		nextDocID += 1
-	} else if err != nil {
-		panic(err)
-	} else {
-		// when the docID is found on database
-		docID = docID_.(uint16)
-	}
+	// Get the hash of current URL
+	docHash := md5.Sum([]byte(urlString))
+	docHashString := hex.EncodeToString(docHash[:])
 
 	//Tokenize document
 	tokenizer := html.NewTokenizer(bytes.NewReader(doc))
@@ -274,14 +215,16 @@ func Index(doc []byte, urlString string,
 		}
 	}
 
-	// tokenize terms in title and body
+	// Clean terms in title and body
 	cleanTitle := laundry(title)
 	cleanBody := laundry(strings.Join(words, " "))
-	// get words info
+
+	// Get frequency and positions of each term
+	// in title and body
 	_, posTitle := getWordInfo(cleanTitle)
 	freqBody, posBody := getWordInfo(cleanBody)
 
-	// initiate batch writer
+	// Initialize batch writer
 	var batchDB_inv []*badger.WriteBatch
 	var batchDB_frw []*badger.WriteBatch
 	for _, invPointer := range inverted {
@@ -295,28 +238,15 @@ func Index(doc []byte, urlString string,
 		defer temp_.Cancel()
 	}
 
-	// check if next word id present in database, set 0 if not
-	var nWID uint32
-	nWID_, errNext_ := forward[4].Get(ctx, "nextWordID")
-	if errNext_ == badger.ErrKeyNotFound {
-		// masukkin 0 as nextWordID
-		nWID = uint32(0)
-		forward[4].Set(ctx, "nextWordID", nWID)
-	} else if errNext_ != nil {
-		panic(errNext_)
-	} else {
-		nWID = nWID_.(uint32)
-	}
-
 	// process and load data to batch writer for inverted tables
-	// map word to word id as well if not exist
+	// map word to wordHash as well if not exist
 	for word, _ := range posTitle {
-		// save from title wordID -> [{DocID, Pos}]
-		setInverted(ctx, word, posTitle, docID, forward, inverted[0], batchDB_frw, batchDB_inv[0], &nWID)
+		// save from title wordHash -> [{DocHash, Positions}]
+		setInverted(ctx, word, posTitle, docHashString, forward, inverted[0], batchDB_frw, batchDB_inv[0], mutex)
 	}
 	for word, _ := range posBody {
-		// save from body wordID-> [{DocID, Pos}]
-		setInverted(ctx, word, posBody, docID, forward, inverted[1], batchDB_frw, batchDB_inv[1], &nWID)
+		// save from body wordHash-> [{DocHash, Positions}]
+		setInverted(ctx, word, posBody, docHashString, forward, inverted[1], batchDB_frw, batchDB_inv[1], mutex)
 	}
 
 	// write the data into database
@@ -327,85 +257,48 @@ func Index(doc []byte, urlString string,
 		i.Flush()
 	}
 
-	// initialise batch writer for children url
-	var abatchDB_inv []*badger.WriteBatch
-	var abatchDB_frw []*badger.WriteBatch
-	for _, invPointer := range inverted {
-		temp_ := invPointer.BatchWrite_init(ctx)
-		abatchDB_inv = append(abatchDB_inv, temp_)
-		defer temp_.Cancel()
-	}
-	for _, forwPointer := range forward {
-		temp_ := forwPointer.BatchWrite_init(ctx)
-		abatchDB_frw = append(abatchDB_frw, temp_)
-		defer temp_.Cancel()
-	}
+	// initialize batch writer for children docInfos
+	abatchDB_frw := forward[1].BatchWrite_init(ctx)
+	defer abatchDB_frw.Cancel()
 
-	// retrieve the most current next doc id
-	nextDocID_, err = forward[4].Get(ctx, "nextDocID")
-	if err != nil {
-		panic(err)
-	}
-	nextDocID = nextDocID_.(uint32)
+	// Initialize container for docHashes of children
+	var kids []string
 
-	// get the docID of each child
-	var kids []uint16
 	for _, child := range children {
+		// Get URL object of current child url
 		childURL, err := url.Parse(child)
-		if err != nil {
-			panic(err)
-		}
 
-		// batch writer require []byte to be passed
-		mChildURL, errMarshal := childURL.MarshalBinary()
-		if errMarshal != nil {
-			panic(errMarshal)
-		}
+		// Get docHash of each child
+		childHash := md5.Sum([]byte(child))
+		childHashString := hex.EncodeToString(childHash[:])
 
-		// get document id corresponding to the child, make one if not present
-		var childID uint16
-		childID_, err := forward[2].Get(ctx, childURL)
+		// Get DocInfo corresponding to the child,
+		// make one if not present (for the sake of getting the url of not-yet-visited child)
+		docInfoC, err := forward[1].Get(ctx, childHashString)
 		if err == badger.ErrKeyNotFound {
-			docInfoC := database.DocInfo{*childURL, nil, time.Now(), 0, nil, []uint16{uint16(docID)}, nil}
+			docInfoC = database.DocInfo{*childURL, nil, time.Now(), 0, nil, []string{childHashString}, nil}
 			docInfoBytes, err := json.Marshal(docInfoC)
 			if err != nil {
 				panic(err)
 			}
 
-			// child is not inserted into URL->DocID; use writebatch instead
-			nDID := strconv.Itoa(int(nextDocID))
-			childID = uint16(nextDocID)
-			if err = abatchDB_frw[2].Set(mChildURL, []byte(nDID), 0); err != nil {
+			// Set docHash of child -> docInfo of child using batch writer
+			if err = abatchDB_frw.Set([]byte(childHashString), docInfoBytes, 0); err != nil {
 				panic(err)
 			}
-			if err = abatchDB_frw[3].Set([]byte(nDID), docInfoBytes, 0); err != nil {
-				panic(err)
-			}
-
-			// set childID
-			// update nextDocID
-			if err = abatchDB_frw[4].Set([]byte("nextDocID"), []byte(strconv.Itoa(int(nextDocID)+1)), 0); err != nil {
-				panic(err)
-			}
-			nextDocID += 1
 		} else if err != nil {
 			panic(err)
-		} else {
-			childID = childID_.(uint16)
 		}
 
-		kids = append(kids, childID)
+		kids = append(kids, childHashString)
 	}
 
-	// load the child data into the db
-	if err = abatchDB_frw[2].Flush(); err != nil {
-		panic(err)
-	}
-	if err = abatchDB_frw[4].Flush(); err != nil {
+	// Save children data into the db
+	if err = abatchDB_frw.Flush(); err != nil {
 		panic(err)
 	}
 
-	// parse title
+	// Parse title & page size
 	pageTitle := strings.Fields(title)
 	var pageSize int
 	if ps == "" {
@@ -417,46 +310,33 @@ func Index(doc []byte, urlString string,
 		}
 	}
 
-	// get the word mapping (wordId -> frequency) of each document
-	wordMapping := make(map[uint32]uint32)
+	// Get the word mapping (wordHash -> frequency) of each document
+	wordMapping := make(map[string]uint32)
 	for word, val := range freqBody {
-		wordID, err := forward[0].Get(ctx, word)
-		if err != nil {
-			panic(err)
-		}
-		wordMapping[wordID.(uint32)] = val
+		h := md5.Sum([]byte(word))
+		wordMapping[hex.EncodeToString(h[:])] = val
 	}
 
-	// initialise document object
+	// Initialize document object
 	var pageInfo database.DocInfo
 	if parentURL == "" {
 		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, nil, wordMapping}
 	} else {
-		parentURL_, err := url.Parse(parentURL)
-		if err != nil {
-			panic(err)
-		}
-		// get parentURL from db which should be in the db ald
-		parentID, err := forward[2].Get(ctx, parentURL_)
-		if err != nil {
-			panic(err)
-		}
-		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []uint16{parentID.(uint16)}, wordMapping}
+		pHash := md5.Sum([]byte(parentURL))
+		pHashString := hex.EncodeToString(pHash[:])
+		pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []string{pHashString}, wordMapping}
 	}
 
-	// insert into forward 3
-
-	if err = forward[3].Set(ctx, docID, pageInfo); err != nil {
+	// Save docHash -> docInfo of current doc
+	if err = forward[1].Set(ctx, docHashString, pageInfo); err != nil {
 		panic(err)
 	}
-
-	mutex.Unlock()
 
 	// Save to file
 	if _, err := os.Stat(docsDir); os.IsNotExist(err) {
 		os.Mkdir(docsDir, 0755)
 	}
-	if err = ioutil.WriteFile(docsDir+strconv.Itoa(int(docID)), doc, 0644); err != nil {
+	if err = ioutil.WriteFile(docsDir+docHashString, doc, 0644); err != nil {
 		panic(err)
 	}
 }

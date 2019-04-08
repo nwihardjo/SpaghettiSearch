@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/tls"
 	"fmt"
 	"github.com/apsdehal/go-logger"
@@ -15,6 +16,8 @@ import (
 	"time"
 )
 
+type URLHash [16]byte
+
 func main() {
 	fmt.Println("Crawler started...")
 
@@ -27,7 +30,7 @@ func main() {
 	startURL := "https://www.cse.ust.hk"
 	numOfPages := 30
 	maxThreadNum := 50
-	visited := make(map[string]bool)
+	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
 	var wgIndexer sync.WaitGroup
@@ -61,22 +64,18 @@ func main() {
 				currentURL := edge[1]
 
 				/* Check if currentURL is already visited */
-				if visited[currentURL] {
+				if visited[md5.Sum([]byte(currentURL))] {
 					/*
 						If currentURL is already visited (handle cycle),
 						do not visit this URL and do not increase the idx
 					*/
 					idx--
-					if parentsToBeAdded[currentURL] == nil {
-						parentsToBeAdded[currentURL] = []string{parentURL}
-					} else {
-						parentsToBeAdded[currentURL] = append(parentsToBeAdded[currentURL], parentURL)
-					}
+					parentsToBeAdded[currentURL] = append(parentsToBeAdded[currentURL], parentURL)
 					continue
 				}
 
 				/* Put currentURL to visited buffer */
-				visited[currentURL] = true
+				visited[md5.Sum([]byte(currentURL))] = true
 
 				/* Add below goroutine (child) to the list of children to be waited */
 				wg.Add(1)
