@@ -35,11 +35,9 @@ var (
 
 type (
 	// Set method should be passed InvKeyword_values as the underlying datatype of the value
-	// AppendValue method should be passed InvKeyword_value as the underlying datatype of the appended value
 
 	DB_Inverted interface {
 		DB
-		AppendValue(ctx context.Context, key interface{}, appendedValue interface{}) error
 	}
 
 	BadgerDB_Inverted struct {
@@ -109,16 +107,13 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 
 	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement
 	inverted := [][]string{
-		[]string{"invKeyword_body/", strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
-		[]string{"invKeyword_title/", strconv.Itoa(temp), "uint32", "map[uint16][]uint32"},
+		[]string{"invKeyword_title/", strconv.Itoa(temp), "string", "map[string][]uint32"},
+		[]string{"invKeyword_body/", strconv.Itoa(temp), "string", "map[string][]uint32"},
 	}
 
 	forward := [][]string{
-		[]string{"Word_wordId/", strconv.Itoa(temp), "string", "uint32"},
-		[]string{"WordId_word/", strconv.Itoa(temp), "uint32", "string"},
-		[]string{"URL_docId/", strconv.Itoa(temp), "url.URL", "uint16"},
-		[]string{"DocId_docInfo/", strconv.Itoa(temp), "uint16", "DocInfo"},
-		[]string{"Indexes/", strconv.Itoa(temp), "string", "uint32"},
+		[]string{"WordHash_word/", strconv.Itoa(temp), "string", "string"},
+		[]string{"DocHash_docInfo/", strconv.Itoa(temp), "string", "DocInfo"},
 	}
 
 	// create directory if not exist
@@ -225,29 +220,6 @@ func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch {
 
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 	return bdb.db.DropAll()
-}
-
-func (bdb_i *BadgerDB_Inverted) AppendValue(ctx context.Context, key interface{}, appendedValue interface{}) error {
-	if _, _, err := checkMarshal(key, bdb_i.keyType, appendedValue, bdb_i.valType); err != nil {
-		return err
-	}
-
-	// value has type of map[uint16][]uint32
-	value, err := bdb_i.Get(ctx, key)
-	if err != nil {
-		return err
-	}
-
-	// append the appendedValue into
-	for k, v := range appendedValue.(map[uint16][]uint32) {
-		value.(map[uint16][]uint32)[k] = v
-	}
-
-	// delete and set the new appended values
-	if err = bdb_i.Set(ctx, key, value); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interface{}, err error) {

@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"crypto/md5"
+	"encoding/hex"
 	"github.com/apsdehal/go-logger"
 	"io/ioutil"
 	"math/rand"
+	"net/url"
 	"os"
 	"testing"
 	"the-SearchEngine/database"
+	"time"
 )
 
 var ctx context.Context
@@ -20,41 +23,72 @@ func BenchmarkMD5(b *testing.B) {
 	}
 }
 
-func BenchmarkGet(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, err := frw[2].Get(ctx, []byte("https://www.cse.ust.hk"))
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func BenchmarkSet(b *testing.B) {
+func BenchmarkGetWord(b *testing.B) {
 	word := "new_word"
 	hashedW := md5.Sum([]byte(word))
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		err := frw[2].Set(ctx, hashedW[:], []byte(word))
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func BenchmarkGetBig(b *testing.B) {
-	p := make([]byte, 10000)
-	_, _ = rand.Read(p)
-	key := []byte("test_get")
-	hashedK := md5.Sum(key)
-	err := frw[2].Set(ctx, hashedK[:], p[:])
+	hashedWStr := hex.EncodeToString(hashedW[:])
+	err := frw[0].Set(ctx, hashedWStr, word)
 	if err != nil {
 		panic(err)
 	}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := frw[2].Get(ctx, hashedK[:])
+		_, err = frw[0].Get(ctx, hashedWStr)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func BenchmarkGet200Children200Words(b *testing.B) {
+	p := make([]byte, 16)
+	_, _ = rand.Read(p)
+	var c []string
+	w := make(map[string]uint32)
+	for i := 0; i < 200; i++ {
+		c = append(c, hex.EncodeToString(p))
+		w[hex.EncodeToString(p)] = 100000
+	}
+
+	currURL, e := url.Parse("https://www.test.com")
+	if e != nil {
+		panic(e)
+	}
+	t := database.DocInfo{
+		*currURL,
+		nil,
+		time.Now(),
+		0,
+		c,
+		nil,
+		w,
+	}
+
+	key := []byte("https://www.test.com")
+	hashedK := md5.Sum(key)
+	hashedKStr := hex.EncodeToString(hashedK[:])
+	if err := frw[1].Set(ctx, hashedKStr, t); err != nil {
+		panic(err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := frw[1].Get(ctx, hashedKStr)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func BenchmarkSetWord(b *testing.B) {
+	word := "new_word"
+	hashedW := md5.Sum([]byte(word))
+	hashedWStr := hex.EncodeToString(hashedW[:])
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		err := frw[0].Set(ctx, hashedWStr, word)
 		if err != nil {
 			panic(err)
 		}
@@ -73,20 +107,22 @@ func TestMain(m *testing.M) {
 	for _, bdb_i := range inv {
 		defer bdb_i.Close(ctx, cancel)
 	}
-	for _, bdb := range frw {
+	for _, bdb := range forw {
 		defer bdb.Close(ctx, cancel)
 	}
 	code := m.Run()
 
 	hashedK := md5.Sum([]byte("new_word"))
-	e := frw[2].Delete(ctx, hashedK[:])
+	hashedKStr := hex.EncodeToString(hashedK[:])
+	e := frw[0].Delete(ctx, hashedKStr)
 	if e != nil {
 		panic(e)
 	}
 
-	key := []byte("test_get")
+	key := []byte("https://www.test.com")
 	hashedK = md5.Sum(key)
-	e = frw[2].Delete(ctx, hashedK[:])
+	hashedKStr = hex.EncodeToString(hashedK[:])
+	e = frw[1].Delete(ctx, hashedKStr)
 	if e != nil {
 		panic(e)
 	}
