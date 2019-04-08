@@ -33,20 +33,6 @@ var (
 	ErrValTypeNotFound = errors.New("Value type not found, double check the type variable passed")
 )
 
-/*
-type (
-	// Set method should be passed InvKeyword_values as the underlying datatype of the value
-
-	DB_Inverted interface {
-		DB
-	}
-
-	BadgerDB_Inverted struct {
-		BadgerDB
-	}
-)
-*/
-
 type (
 	// TODO: add logger debug in each function
 	DB interface {
@@ -73,17 +59,17 @@ type (
 		Iterate(ctx context.Context) (*collector, error)
 
 		// initialise BadgerWriteBatch object for the corresponding table
-		BatchWrite_init(ctx context.Context) (BatchWriter)
+		BatchWrite_init(ctx context.Context) BatchWriter
 
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
 	}
 
 	BadgerDB struct {
-		db      	*badger.DB
-		logger  	*logger.Logger
-		keyType 	string
-		valType 	string
+		db      *badger.DB
+		logger  *logger.Logger
+		keyType string
+		valType string
 	}
 )
 
@@ -94,7 +80,7 @@ type (
 
 		// write the key value pairs collected in the batch writer
 		// will return nothing if there is nothing to flush
-		Flush(ctx context.Context) error 
+		Flush(ctx context.Context) error
 
 		// wrapper around Cancel function for deferring
 		Cancel(ctx context.Context)
@@ -102,11 +88,12 @@ type (
 
 	// wrapper around badger WriteBatch to support type checking
 	BadgerBatchWriter struct {
-		batchWriter	*badger.WriteBatch
-		keyType		string
-		valType		string
+		batchWriter *badger.WriteBatch
+		keyType     string
+		valType     string
 	}
 )
+
 /*
 	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)
 refer to `noschema_schema.go` for each table's key and value data types
@@ -181,23 +168,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 	return inv, forw, nil
 }
 
-/*
-func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB_Inverted, error) {
-	opts := getOpts(loadMethod, dir)
-
-	badgerDB, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	bdb_i := &BadgerDB_Inverted{BadgerDB{badgerDB, logger, keyType, valType}}
-
-	// run garbage collection in advance
-	go bdb_i.runGC(ctx)
-	return bdb_i, nil
-}
-*/
-
 func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB, error) {
 	opts := getOpts(loadMethod, dir)
 
@@ -207,10 +177,10 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMet
 	}
 
 	bdb := &BadgerDB{
-		db:      	badgerDB,
-		logger:  	logger,
-		keyType: 	keyType,
-		valType: 	valType,
+		db:      badgerDB,
+		logger:  logger,
+		keyType: keyType,
+		valType: valType,
 	}
 
 	// run garbage collection in advance
@@ -236,28 +206,28 @@ func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	return opts
 }
 
-func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) (BatchWriter) {
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) BatchWriter {
 	bwb := &BadgerBatchWriter{
-		batchWriter:	bdb.db.NewWriteBatch(),
-		keyType:	bdb.keyType,
-		valType: 	bdb.valType,
+		batchWriter: bdb.db.NewWriteBatch(),
+		keyType:     bdb.keyType,
+		valType:     bdb.valType,
 	}
-	
+
 	return bwb
 }
-	
+
 func (bwb *BadgerBatchWriter) BatchSet(ctx context.Context, key_ interface{}, value_ interface{}) error {
 	key, value, err := checkMarshal(key_, bwb.keyType, value_, bwb.valType)
 	if err != nil {
 		return err
 	}
 
-	// pass the key-value pairs in []byte to the batch writer	
+	// pass the key-value pairs in []byte to the batch writer
 	if err = bwb.batchWriter.Set(key, value, 0); err != nil {
 		return err
 	}
 	return nil
-}	
+}
 
 func (bwb *BadgerBatchWriter) Flush(ctx context.Context) error {
 	if err := bwb.batchWriter.Flush(); err != nil {
@@ -270,7 +240,7 @@ func (bwb *BadgerBatchWriter) Flush(ctx context.Context) error {
 func (bwb *BadgerBatchWriter) Cancel(ctx context.Context) {
 	bwb.batchWriter.Cancel()
 }
-	
+
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
 	return bdb.db.DropAll()
 }

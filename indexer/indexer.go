@@ -223,7 +223,7 @@ func Index(doc []byte, urlString string,
 		defer temp.Cancel(ctx)
 		batchWriter_inverted = append(batchWriter_inverted, temp)
 	}
-		
+
 	// process and load data to batch writer for inverted tables
 	// map word to wordHash as well if not exist
 	for word, _ := range posTitle {
