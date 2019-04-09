@@ -10,23 +10,14 @@ import (
 /*
 =============================== SCHEMA DEFINITION ==========================================
 	Schema for inverted table for both body and title page schema:
-		key	: wordId (type: uint32)
-		value	: map of DocId to list of positions (type: map[uint16][]uint32)
+		key	: wordHash (type: string)
+		value	: map of docHash to list of positions (type: map[string][]uint32)
 	Schema for forward table forw[0]:
-		key	: word (type: string)
-		value	: wordId (type: uint32)
-	Schema for forward table forw[1]:
-		key	: wordId (type: uint32)
+		key	: wordHash (type: string)
 		value	: word (type: string)
-	Schema for forward table forw[2]:
-		key	: URL (type url.URL)
-		value	: DocId (type: uint16)
-	Schema for forward table forw[3]:
-		key:	: DocId (type: uint16)
+	Schema for forward table forw[1]:
+		key:	: docHash (type: string)
 		value	: document info including the URL (type: DocInfo)
-	Schema for forward table forw[4]:
-		key	: index type (type: string)
-		value	: biggest index value (type: uint32)
 ========================= MARSHAL AND UNMARSHALING =======================================
 	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
 		byteArray, err := json.Marshal(any_struct_defined_in_this_file)

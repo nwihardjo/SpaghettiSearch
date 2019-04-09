@@ -34,18 +34,6 @@ var (
 )
 
 type (
-	// Set method should be passed InvKeyword_values as the underlying datatype of the value
-
-	DB_Inverted interface {
-		DB
-	}
-
-	BadgerDB_Inverted struct {
-		BadgerDB
-	}
-)
-
-type (
 	// TODO: add logger debug in each function
 	DB interface {
 		// TODO: integrate prefix search
@@ -58,6 +46,7 @@ type (
 		// return nil if key not found
 		Has(ctx context.Context, key interface{}) (bool, error)
 
+		// delete an key-value pair in the table, given the key
 		Delete(ctx context.Context, key interface{}) error
 
 		// will call cancel which aborts all process running on the ctx
@@ -69,8 +58,8 @@ type (
 		// data is in random , due to concurrency
 		Iterate(ctx context.Context) (*collector, error)
 
-		// batch write api to minimise the creation of transaction
-		BatchWrite_init(ctx context.Context) *badger.WriteBatch
+		// initialise BadgerWriteBatch object for the corresponding table
+		BatchWrite_init(ctx context.Context) BatchWriter
 
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
@@ -84,36 +73,54 @@ type (
 	}
 )
 
+type (
+	BatchWriter interface {
+		// initialise batch writer, set and collect the key-value pairs to be written in batch
+		BatchSet(ctx context.Context, key interface{}, value interface{}) error
+
+		// write the key value pairs collected in the batch writer
+		// will return nothing if there is nothing to flush
+		Flush(ctx context.Context) error
+
+		// wrapper around Cancel function for deferring
+		Cancel(ctx context.Context)
+	}
+
+	// wrapper around badger WriteBatch to support type checking
+	BadgerBatchWriter struct {
+		batchWriter *badger.WriteBatch
+		keyType     string
+		valType     string
+	}
+)
+
 /*
 	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)
-	refer to `noschema_schema.go` for each table's key and value data types
+refer to `noschema_schema.go` for each table's key and value data types
 	\params: context, logger
-	\return: list of inverted tables (type: []DB_Inverted), list of forward tables (type: []DB), error
-		inv[0]: inverted table for keywords in body section
-		inv[1]: inverted table for keywords in title section
-		forw[0]: forward table for word to wordId mapping
-		forw[1]: forward table for wordId to word mapping
-		forw[2]: forward table for URL to DocId mapping
-		forw[3]: forward table for DocId to DocInfo mapping
-		forw[4]: forward table for keeping track of index
+	\return: list of inverted tables, list of forward tables (type: []DB), error
+		inv[0]: inverted table for keywords in title section
+		inv[1]: inverted table for keywords in body section
+		forw[0]: forward table for wordHash (wordId) to word mapping
+		forw[1]: forward table for docHash (docId) to DocInfo mapping
 */
 
-func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, forw []DB, err error) {
+func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, err error) {
 	base_dir := "./db_data/"
 
 	// table loading mode
 	// default is MemoryMap, 1 is LoadToRAM (most optimised), 2 is FileIO (all disk)
-	temp := 1
+	loadMode := 1
 
 	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement
 	inverted := [][]string{
-		[]string{"invKeyword_title/", strconv.Itoa(temp), "string", "map[string][]uint32"},
-		[]string{"invKeyword_body/", strconv.Itoa(temp), "string", "map[string][]uint32"},
+		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
+		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
 	}
 
 	forward := [][]string{
-		[]string{"WordHash_word/", strconv.Itoa(temp), "string", "string"},
-		[]string{"DocHash_docInfo/", strconv.Itoa(temp), "string", "DocInfo"},
+		[]string{"WordHash_word/", strconv.Itoa(loadMode), "string", "string"},
+		[]string{"DocHash_docInfo/", strconv.Itoa(loadMode), "string", "DocInfo"},
 	}
 
 	// create directory if not exist
@@ -137,7 +144,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 			return nil, nil, err
 		}
 
-		temp, err := NewBadgerDB_Inverted(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
+		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -159,21 +166,6 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB_Inverted, for
 	}
 
 	return inv, forw, nil
-}
-
-func NewBadgerDB_Inverted(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB_Inverted, error) {
-	opts := getOpts(loadMethod, dir)
-
-	badgerDB, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	bdb_i := &BadgerDB_Inverted{BadgerDB{badgerDB, logger, keyType, valType}}
-
-	// run garbage collection in advance
-	go bdb_i.runGC(ctx)
-	return bdb_i, nil
 }
 
 func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB, error) {
@@ -214,8 +206,39 @@ func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	return opts
 }
 
-func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) *badger.WriteBatch {
-	return bdb.db.NewWriteBatch()
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) BatchWriter {
+	bwb := &BadgerBatchWriter{
+		batchWriter: bdb.db.NewWriteBatch(),
+		keyType:     bdb.keyType,
+		valType:     bdb.valType,
+	}
+
+	return bwb
+}
+
+func (bwb *BadgerBatchWriter) BatchSet(ctx context.Context, key_ interface{}, value_ interface{}) error {
+	key, value, err := checkMarshal(key_, bwb.keyType, value_, bwb.valType)
+	if err != nil {
+		return err
+	}
+
+	// pass the key-value pairs in []byte to the batch writer
+	if err = bwb.batchWriter.Set(key, value, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bwb *BadgerBatchWriter) Flush(ctx context.Context) error {
+	if err := bwb.batchWriter.Flush(); err != nil {
+		panic(err)
+		return err
+	}
+	return nil
+}
+
+func (bwb *BadgerBatchWriter) Cancel(ctx context.Context) {
+	bwb.batchWriter.Cancel()
 }
 
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
@@ -227,7 +250,6 @@ func (bdb *BadgerDB) Get(ctx context.Context, key_ interface{}) (value_ interfac
 	var value []byte
 	key, _, err := checkMarshal(key_, bdb.keyType, nil, "")
 	if err != nil {
-		fmt.Println("error from get ", err)
 		return nil, err
 	}
 
@@ -313,7 +335,6 @@ func (bdb *BadgerDB) Delete(ctx context.Context, key_ interface{}) error {
 }
 
 func (bdb *BadgerDB) Close(ctx context.Context, cancel context.CancelFunc) error {
-	// perform cancellation of the running process using context
 	cancel()
 	return bdb.db.Close()
 }

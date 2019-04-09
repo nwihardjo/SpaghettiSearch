@@ -74,7 +74,7 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 	currentURL string, client *http.Client,
 	queue *channels.InfiniteChannel, mutex *sync.Mutex,
-	inv []database.DB_Inverted, forw []database.DB) {
+	inv []database.DB, forw []database.DB) {
 
 	defer wg.Done()
 

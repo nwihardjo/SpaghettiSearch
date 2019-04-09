@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/dgraph-io/badger"
 	"github.com/surgebase/porter2"
@@ -68,31 +67,24 @@ func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string
 	return
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, docHash string, forward []database.DB, inverted database.DB_Inverted,
-	batchDB_forw []*badger.WriteBatch, batchDB_inv *badger.WriteBatch, mutex *sync.Mutex) {
+func setInverted(ctx context.Context, word string, pos map[string][]uint32, docHash string, forward []database.DB, inverted database.DB, bw_forward []database.BatchWriter, bw_inverted database.BatchWriter, mutex *sync.Mutex) {
 
 	// initialise inverted keywords values
 	invKeyVals := make(map[string][]uint32)
 	invKeyVals[docHash] = pos[word]
-
-	// make inverted keywords values into []byte for batch writer
-	mInvVals, err := json.Marshal(invKeyVals)
-	if err != nil {
-		panic(err)
-	}
 
 	// Compute the wordHash of current word
 	wordHash := md5.Sum([]byte(word))
 	wordHashString := hex.EncodeToString(wordHash[:])
 
 	// Check if current wordHash exist
-	_, err = forward[0].Get(ctx, wordHashString)
+	_, err := forward[0].Get(ctx, wordHashString)
 
 	// If not exist, create one
 	if err == badger.ErrKeyNotFound {
 		// batch writer accepts array of byte only, conversion to []byte is needed
-		// forw[1] save wordHash -> word
-		if err = batchDB_forw[0].Set([]byte(wordHashString), []byte(word), 0); err != nil {
+		// forw[0] save wordHash -> word
+		if err = bw_forward[0].BatchSet(ctx, wordHashString, word); err != nil {
 			panic(err)
 		}
 	} else if err != nil {
@@ -108,7 +100,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, docH
 	value, err := inverted.Get(ctx, wordHashString)
 	if err == badger.ErrKeyNotFound {
 		// there's no entry on the inverted table for the corresponding wordHash
-		if err = batchDB_inv.Set([]byte(wordHashString), mInvVals, 0); err != nil {
+		if err = bw_inverted.BatchSet(ctx, wordHashString, invKeyVals); err != nil {
 			panic(err)
 		}
 	} else if err != nil {
@@ -117,14 +109,8 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, docH
 		// append new docHash entry to the existing one
 		value.(map[string][]uint32)[docHash] = append(value.(map[string][]uint32)[docHash], pos[word]...)
 
-		// need to convert it back to []byte for batch writer
-		tempVal, err := json.Marshal(value)
-		if err != nil {
-			panic(err)
-		}
-
 		// load new appended value of inverted table according to the wordHash
-		if err = batchDB_inv.Set([]byte(wordHashString), tempVal, 0); err != nil {
+		if err = bw_inverted.BatchSet(ctx, wordHashString, value); err != nil {
 			panic(err)
 		}
 	}
@@ -168,7 +154,7 @@ func AddParent(currentURL_ string, parents []string,
 
 func Index(doc []byte, urlString string,
 	lastModified time.Time, ps string, mutex *sync.Mutex,
-	inverted []database.DB_Inverted, forward []database.DB,
+	inverted []database.DB, forward []database.DB,
 	parentURL string, children []string) {
 
 	var title string
@@ -224,42 +210,46 @@ func Index(doc []byte, urlString string,
 	_, posTitle := getWordInfo(cleanTitle)
 	freqBody, posBody := getWordInfo(cleanBody)
 
-	// Initialize batch writer
-	var batchDB_inv []*badger.WriteBatch
-	var batchDB_frw []*badger.WriteBatch
-	for _, invPointer := range inverted {
-		temp_ := invPointer.BatchWrite_init(ctx)
-		batchDB_inv = append(batchDB_inv, temp_)
-		defer temp_.Cancel()
+	// initiate batch writer object
+	var batchWriter_forward []database.BatchWriter
+	var batchWriter_inverted []database.BatchWriter
+	for _, i := range forward {
+		temp := i.BatchWrite_init(ctx)
+		defer temp.Cancel(ctx)
+		batchWriter_forward = append(batchWriter_forward, temp)
 	}
-	for _, forwPointer := range forward {
-		temp_ := forwPointer.BatchWrite_init(ctx)
-		batchDB_frw = append(batchDB_frw, temp_)
-		defer temp_.Cancel()
+	for _, i := range inverted {
+		temp := i.BatchWrite_init(ctx)
+		defer temp.Cancel(ctx)
+		batchWriter_inverted = append(batchWriter_inverted, temp)
 	}
 
 	// process and load data to batch writer for inverted tables
 	// map word to wordHash as well if not exist
 	for word, _ := range posTitle {
 		// save from title wordHash -> [{DocHash, Positions}]
-		setInverted(ctx, word, posTitle, docHashString, forward, inverted[0], batchDB_frw, batchDB_inv[0], mutex)
+		setInverted(ctx, word, posTitle, docHashString, forward, inverted[0], batchWriter_forward, batchWriter_inverted[0], mutex)
 	}
 	for word, _ := range posBody {
 		// save from body wordHash-> [{DocHash, Positions}]
-		setInverted(ctx, word, posBody, docHashString, forward, inverted[1], batchDB_frw, batchDB_inv[1], mutex)
+		setInverted(ctx, word, posBody, docHashString, forward, inverted[1], batchWriter_forward, batchWriter_inverted[1], mutex)
 	}
 
-	// write the data into database
-	for _, f := range batchDB_frw {
-		f.Flush()
+	// write the key-value pairs set on batch write. If no value is to be flushed, it'll return nil
+	for _, f := range batchWriter_forward {
+		if err = f.Flush(ctx); err != nil {
+			panic(err)
+		}
 	}
-	for _, i := range batchDB_inv {
-		i.Flush()
+	for _, i := range batchWriter_inverted {
+		if err = i.Flush(ctx); err != nil {
+			panic(err)
+		}
 	}
 
-	// initialize batch writer for children docInfos
-	abatchDB_frw := forward[1].BatchWrite_init(ctx)
-	defer abatchDB_frw.Cancel()
+	// initialise batch writer for child append
+	bw_child := forward[1].BatchWrite_init(ctx)
+	defer bw_child.Cancel(ctx)
 
 	// Initialize container for docHashes of children
 	var kids []string
@@ -277,13 +267,9 @@ func Index(doc []byte, urlString string,
 		docInfoC, err := forward[1].Get(ctx, childHashString)
 		if err == badger.ErrKeyNotFound {
 			docInfoC = database.DocInfo{*childURL, nil, time.Now(), 0, nil, []string{childHashString}, nil}
-			docInfoBytes, err := json.Marshal(docInfoC)
-			if err != nil {
-				panic(err)
-			}
 
 			// Set docHash of child -> docInfo of child using batch writer
-			if err = abatchDB_frw.Set([]byte(childHashString), docInfoBytes, 0); err != nil {
+			if err = bw_child.BatchSet(ctx, childHashString, docInfoC); err != nil {
 				panic(err)
 			}
 		} else if err != nil {
@@ -294,7 +280,7 @@ func Index(doc []byte, urlString string,
 	}
 
 	// Save children data into the db
-	if err = abatchDB_frw.Flush(); err != nil {
+	if err = bw_child.Flush(ctx); err != nil {
 		panic(err)
 	}
 
