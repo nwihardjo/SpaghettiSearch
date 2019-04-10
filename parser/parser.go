@@ -32,19 +32,6 @@ func Parse(doc []byte) (titleInfo Term, bodyInfo Term) {
   return
 }
 
-// func Parse(doc []byte) (title string, freqTitle map[string]uint32, posTitle map[string][]uint32, freqBody map[string]uint32, posBody map[string][]uint32) {
-//   title, words := tokenize(doc)
-//   // Clean terms in title and body
-//   cleanTitle := laundry(title)
-//   cleanBody := laundry(strings.Join(words, " "))
-//
-//   // Get frequency and positions of each term
-//   // in title and body
-//   freqTitle, posTitle = getWordInfo(cleanTitle)
-//   freqBody, posBody = getWordInfo(cleanBody)
-//   return
-// }
-
 func tokenize(doc []byte) (title string, words []string) {
   var prevToken string
   //Tokenize document
