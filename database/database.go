@@ -121,6 +121,8 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 	forward := [][]string{
 		[]string{"WordHash_word/", strconv.Itoa(loadMode), "string", "string"},
 		[]string{"DocHash_docInfo/", strconv.Itoa(loadMode), "string", "DocInfo"},
+		[]string{"DocHash_children/", strconv.Itoa(loadMode), "string", "[]string"},
+		[]string{"DocHash_rank/", strconv.Itoa(loadMode), "string", "float64"},
 	}
 
 	// create directory if not exist

@@ -149,6 +149,14 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val = []byte(tempVal)
+		case "[]string":
+			tempVal, ok := v.([]string)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
+	
+			// json.Marshal is not used because of the low compaction
+			val, err = json.Marshal(tempVal)
 		case "map[string][]uint32":
 			tempVal, ok := v.(map[string][]uint32)
 			if !ok {
@@ -176,6 +184,12 @@ func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 	switch valType {
 	case "string":
 		return string(v), nil
+	case "[]string":
+		var tempVal []string
+		if err = json.Unmarshal(v, &tempVal); err != nil {
+		return nil, err
+		}
+		return tempVal, nil
 	case "map[string][]uint32":
 		tempVal := make(map[string][]uint32)
 		err = json.Unmarshal(v, &tempVal)
