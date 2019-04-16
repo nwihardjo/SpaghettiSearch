@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"the-SearchEngine/database"
 	"the-SearchEngine/indexer"
@@ -23,8 +24,8 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				/* Skip if no href or if href is anchor */
 				if n.Attr[a].Val == "" ||
 					n.Attr[a].Val[0] == '#' ||
-					(len(n.Attr[a].Val) >= 10 && n.Attr[a].Val[:10] == "javascript") ||
-					(len(n.Attr[a].Val) >= 6 && n.Attr[a].Val[:6] == "mailto") {
+					strings.HasPrefix(n.Attr[a].Val, "javascript") ||
+					strings.HasPrefix(n.Attr[a].Val, "mailto") {
 					continue
 				}
 
@@ -84,7 +85,7 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return
 	}
 
 	fmt.Print("Last Modified: ")
