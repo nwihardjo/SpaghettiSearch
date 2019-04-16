@@ -56,7 +56,7 @@ type (
 		DropTable(ctx context.Context) error
 
 		// data is in random , due to concurrency
-		Iterate(ctx context.Context) (*collector, error)
+		Iterate(ctx context.Context) (*Collector, error)
 
 		// initialise BadgerWriteBatch object for the corresponding table
 		BatchWrite_init(ctx context.Context) BatchWriter
@@ -72,6 +72,7 @@ type (
 		valType string
 	}
 )
+
 
 type (
 	BatchWriter interface {
@@ -208,16 +209,6 @@ func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	return opts
 }
 
-func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) BatchWriter {
-	bwb := &BadgerBatchWriter{
-		batchWriter: bdb.db.NewWriteBatch(),
-		keyType:     bdb.keyType,
-		valType:     bdb.valType,
-	}
-
-	return bwb
-}
-
 func (bwb *BadgerBatchWriter) BatchSet(ctx context.Context, key_ interface{}, value_ interface{}) error {
 	key, value, err := checkMarshal(key_, bwb.keyType, value_, bwb.valType)
 	if err != nil {
@@ -241,6 +232,16 @@ func (bwb *BadgerBatchWriter) Flush(ctx context.Context) error {
 
 func (bwb *BadgerBatchWriter) Cancel(ctx context.Context) {
 	bwb.batchWriter.Cancel()
+}
+
+func (bdb *BadgerDB) BatchWrite_init(ctx context.Context) BatchWriter {
+	bwb := &BadgerBatchWriter{
+		batchWriter: bdb.db.NewWriteBatch(),
+		keyType:     bdb.keyType,
+		valType:     bdb.valType,
+	}
+
+	return bwb
 }
 
 func (bdb *BadgerDB) DropTable(ctx context.Context) error {
@@ -360,20 +361,20 @@ func (bdb *BadgerDB) runGC(ctx context.Context) {
 	}
 }
 
-type collector struct {
+type Collector struct {
 	KV []*bpb.KV
 }
 
-func (c *collector) Send(list *bpb.KVList) error {
+func (c *Collector) Send(list *bpb.KVList) error {
 	c.KV = append(c.KV, list.Kv...)
 	return nil
 }
 
-func (bdb *BadgerDB) Iterate(ctx context.Context) (*collector, error) {
+func (bdb *BadgerDB) Iterate(ctx context.Context) (*Collector, error) {
 	stream := bdb.db.NewStream()
 	stream.LogPrefix = "Iterating using Stream framework"
 
-	c := &collector{}
+	c := &Collector{}
 
 	stream.Send = func(list *bpb.KVList) error {
 		return c.Send(list)

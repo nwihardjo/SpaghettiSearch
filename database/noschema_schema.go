@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"strconv"
 )
 
 /*
@@ -154,9 +155,13 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 			if !ok {
 				return nil, nil, ErrValTypeNotMatch
 			}
-	
-			// json.Marshal is not used because of the low compaction
 			val, err = json.Marshal(tempVal)
+		case "float64":
+			tempVal, ok := v.(float64)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
+			val, err = []byte(strconv.FormatFloat(tempVal, 'f', -1, 64)), nil
 		case "map[string][]uint32":
 			tempVal, ok := v.(map[string][]uint32)
 			if !ok {
@@ -187,9 +192,11 @@ func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 	case "[]string":
 		var tempVal []string
 		if err = json.Unmarshal(v, &tempVal); err != nil {
-		return nil, err
+			return nil, err
 		}
 		return tempVal, nil
+	case "float64":
+		return strconv.ParseFloat(string(v), 64)
 	case "map[string][]uint32":
 		tempVal := make(map[string][]uint32)
 		err = json.Unmarshal(v, &tempVal)

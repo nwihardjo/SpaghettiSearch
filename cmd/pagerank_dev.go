@@ -2,17 +2,19 @@ package main
 
 import (
 	"time"
-	"./database"
+	"the-SearchEngine/database"
 	"strconv"
 	"math/rand"
 	"fmt"
 	"encoding/hex"
 	"context"
 	"github.com/apsdehal/go-logger"
-	"net/url"
-	"encoding/json"
+	//"net/url"
+	//"encoding/json"
 	"crypto/md5"
+	"sync"
 	"io/ioutil"
+	bpb "github.com/dgraph-io/badger/pb"
 )
 
 func main() {
@@ -28,7 +30,7 @@ func main() {
 
 
 	n := 100000
-
+/*
 	bw := forw[1].BatchWrite_init(ctx) 
 	defer bw.Cancel(ctx)
 	// populate database
@@ -83,7 +85,7 @@ func main() {
 		extractedData[string(kv.Key)] = tempVal.Children
 	}
 	fmt.Println("it took first %v", time.Since(timer))
-
+*/
 	
 	bw_ := forw[2].BatchWrite_init(ctx) 
 	defer bw_.Cancel(ctx)
@@ -107,12 +109,53 @@ func main() {
 		panic(err)
 	}
 
-	timer = time.Now()
+	timer := time.Now()
 	data_, err := forw[2].Iterate(ctx)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("======================= ITERATIN FORW[2] TOOK ==================", time.Since(timer))
+
+
+	timer = time.Now()
+	maxNumThreads := 1 
+	var wg sync.WaitGroup
+	wg.Add(maxNumThreads)
+	
+	n = len(data_.KV)
+	ch := make(chan []string, n)
+	
+	var dist int
+	if n % maxNumThreads > 0 {
+		dist = 1 + n / maxNumThreads
+	} else {
+		dist = n / maxNumThreads
+	}
+
+	for i := 0; i < maxNumThreads; i++ {
+		start := i * dist
+		
+		var end int
+		if (i + 1) * dist > n {
+			end = n
+		} else {
+			end = (i + 1) * dist
+		}
+
+		go parseByteArray(&wg, ch, data_.KV[start:end])
+	}
+	
+	wg.Wait()
+	close(ch)	
+
+	dat := make([][]string, n)
+	for c := range ch {
+		dat = append(dat, c)
+	}
+	fmt.Println(dat)
+	fmt.Println("ITERATING USING 10 THREADS TOOK", time.Since(timer))
+/*
+	timer = time.Now()		
 	extractedData_ := make(map[string][]string, len(data_.KV))
 	for _, kv := range data_.KV {
 		tempVal := make([]string, len(kv.Value))
@@ -121,5 +164,39 @@ func main() {
 		}
 		extractedData_[string(kv.Key)] = tempVal
 	}
-	fmt.Println("it took second %v", time.Since(timer))
+	fmt.Println("ITERATING THE OLD WAY TOOK", time.Since(timer))
+/*
+
+	n = 100000
+	temp := make(map[int]int, n)	
+ 	for i:= 0; i < n; i ++ {
+		temp[i] = i
+	}
+	timer = time.Now()
+	for i := 0; i < n; i ++ {
+		//fmt.Print(i)	
+	}
+	fmt.Println("====================")
+	fmt.Println(" looping through i ", time.Since(timer))
+	
+	timer = time.Now()
+	for _, _ = range temp {
+		//fmt.Print(k)
+	}
+	fmt.Println("====================")
+	fmt.Println(" looping through map ", time.Since(timer)) 
+*/
 }
+
+func parseByteArray(wg *sync.WaitGroup, ch chan []string, data []*bpb.KV) {
+	defer wg.Done()
+	
+	for _, kv := range data {
+		tempVal := make([]string, len(data))
+		tempVal[0] = string(kv.Key)
+		for k, val := range kv.Value {
+			tempVal[k+1] = string(val)
+		}
+		ch <- tempVal
+	}
+}	

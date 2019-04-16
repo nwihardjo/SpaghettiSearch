@@ -128,5 +128,7 @@ func main() {
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
 	
+	timer := time.Now()
 	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw) 
+	fmt.Println("Updating pagerank (including read and write to db) takes", time.Since(timer))
 }

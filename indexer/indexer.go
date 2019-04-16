@@ -87,7 +87,7 @@ func Index(doc []byte, urlString string,
 	defer bw_child.Cancel(ctx)
 
 	// Initialize container for docHashes of children
-	var kids []string
+	kids := make([]string, len(children))
 
 	for _, child := range children {
 		// Get URL object of current child url
@@ -116,6 +116,11 @@ func Index(doc []byte, urlString string,
 
 	// Save children data into the db
 	if err = bw_child.Flush(ctx); err != nil {
+		panic(err)
+	}
+
+	// store child-relationship for faster pagerank calculation
+	if err = forward[2].Set(ctx, docHashString, kids); err != nil {
 		panic(err)
 	}
 
