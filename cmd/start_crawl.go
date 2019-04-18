@@ -15,6 +15,7 @@ import (
 	"the-SearchEngine/crawler"
 	"the-SearchEngine/database"
 	"the-SearchEngine/indexer"
+	"the-SearchEngine/ranking"
 	"time"
 )
 
@@ -139,4 +140,8 @@ func main() {
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	
+	timer := time.Now()
+	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw) 
+	fmt.Println("Updating pagerank (including read and write to db) takes", time.Since(timer))
 }
