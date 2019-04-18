@@ -8,7 +8,9 @@ import (
 	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"the-SearchEngine/crawler"
 	"the-SearchEngine/database"
@@ -28,8 +30,9 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk"
-	numOfPages := 30
-	maxThreadNum := 50
+	numOfPages := 500
+	maxThreadNum := 100
+	domain := "ust.hk"
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
@@ -71,6 +74,16 @@ func main() {
 					*/
 					idx--
 					parentsToBeAdded[currentURL] = append(parentsToBeAdded[currentURL], parentURL)
+					continue
+				}
+
+				/* If currentURL is not in the specified domain, skip it */
+				u, e := url.Parse(currentURL)
+				if e != nil {
+					panic(e)
+				}
+				if !strings.HasSuffix(u.Hostname(), domain) {
+					idx--
 					continue
 				}
 
