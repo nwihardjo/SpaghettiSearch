@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for a := 0; a < len(n.Attr); a++ {
 			if n.Attr[a].Key == "href" {
+				urlRe := regexp.MustCompile("[^A-Za-z0-9-._~:/?#[]@!$&'()\\*\\+,;=]|\r?\n| ")
 
 				/* Skip if no href or if href is anchor */
 				if n.Attr[a].Val == "" ||
@@ -52,15 +54,21 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 					(thisURL[:4] != "http" && thisURL[:4] != "www.") {
 
 					if thisURL[0] != '/' {
-						queue.In() <- []string{baseURL, baseURL + "/" + thisURL}
-						children[baseURL+"/"+thisURL] = true
+						head := urlRe.ReplaceAllString(baseURL, "")
+						tail := urlRe.ReplaceAllString(baseURL + "/" + thisURL, "")
+						queue.In() <- []string{head, tail}
+						children[tail] = true
 					} else {
-						queue.In() <- []string{baseURL, baseURL + thisURL}
-						children[baseURL+thisURL] = true
+						head := urlRe.ReplaceAllString(baseURL, "")
+						tail := urlRe.ReplaceAllString(baseURL + thisURL, "")
+						queue.In() <- []string{head, tail}
+						children[tail] = true
 					}
 				} else {
-					queue.In() <- []string{baseURL, thisURL}
-					children[thisURL] = true
+					head := urlRe.ReplaceAllString(baseURL, "")
+					tail := urlRe.ReplaceAllString(thisURL, "")
+					queue.In() <- []string{head, tail}
+					children[tail] = true
 				}
 
 				break
@@ -73,8 +81,8 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 }
 
 func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
-	currentURL string, client *http.Client,
-	queue *channels.InfiniteChannel, mutex *sync.Mutex,
+	currentURL string, errorsChannel *channels.InfiniteChannel, client *http.Client,
+	lock2 *sync.RWMutex, queue *channels.InfiniteChannel, mutex *sync.Mutex,
 	inv []database.DB, forw []database.DB) {
 
 	defer wg.Done()
@@ -84,6 +92,7 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 	fmt.Println("Goroutine id " + strconv.Itoa(idx) + " visited " + currentURL + " (elapsed time: " + time.Now().Sub(innerStart).String() + ")")
 
 	if err != nil {
+		errorsChannel.In() <- currentURL
 		fmt.Println(err)
 		return
 	}
@@ -126,7 +135,7 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 		childsArr = append(childsArr, k)
 	}
 
-	indexer.Index(htmlData, currentURL, lm, ps, mutex, inv, forw, parentURL, childsArr)
+	indexer.Index(htmlData, currentURL, lock2, lm, ps, mutex, inv, forw, parentURL, childsArr)
 
 	resp.Body.Close()
 }
