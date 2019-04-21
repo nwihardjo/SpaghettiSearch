@@ -20,8 +20,8 @@ type Term struct {
 func Parse(doc []byte) (titleInfo Term, bodyInfo Term) {
   title, words := tokenize(doc)
   // Clean terms in title and body
-  cleanTitle := laundry(title)
-  cleanBody := laundry(strings.Join(words, " "))
+  cleanTitle := Laundry(title)
+  cleanBody := Laundry(strings.Join(words, " "))
 
   // Get frequency and positions of each term
   // in title and body
@@ -79,7 +79,7 @@ func isStopWord(s string) (isStop bool) {
 	return
 }
 
-func laundry(s string) (c []string) {
+func Laundry(s string) (c []string) {
 	// remove all special characters
 	regex := regexp.MustCompile("[^a-zA-Z0-9]")
 	s = regex.ReplaceAllString(s, " ")

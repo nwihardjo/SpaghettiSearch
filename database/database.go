@@ -104,6 +104,8 @@ refer to `noschema_schema.go` for each table's key and value data types
 		inv[1]: inverted table for keywords in body section
 		forw[0]: forward table for wordHash (wordId) to word mapping
 		forw[1]: forward table for docHash (docId) to DocInfo mapping
+		forw[2]: forward table for docHash to list of its child
+		forw[3]: forward table for docHash to pageRank value
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, err error) {
