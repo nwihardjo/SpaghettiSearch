@@ -9,15 +9,16 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/dgraph-io/badger"
 	"the-SearchEngine/parser"
+	"the-SearchEngine/indexer"
 	"math"
 	db "the-SearchEngine/database"
+	"io/ioutil"
 )
 
 // global declaration used in db
 var forw, inv []db.DB
 var ctx context.Context
 var log *logger.Logger
-var totalPages int32
 
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
@@ -26,33 +27,34 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	docCompressed, err := forward[1].Iterate(ctx)
-	if err != nil {
+	var totalDocs float64
+	if cachedWebpages, err := ioutil.ReadDir(indexer.DocsDir); err != nil {
 		panic(err)
+	} else {
+		totalDocs = float64(len(cachedWebpages))
 	}
-	totalPages = len(docCompressed.KV)
 
 	log.Debugf("Querying terms:", query)
 	q := parser.Laundry(query)
 
-	var docs []db.DocInfo
+	docs := make([]db.DocInfo, 0, 50)
+	docsRank := make([]float64, 0, 50)
 	idf := make([]float64, len(q))
-
+	tf := make([][]float64, len(q))
 	for i := 0; i < len(q) - 1; i ++ {
+		// title inverted tables
 		v, err := inv[0].Get(ctx, q[i])
 		if err == badger.ErrKeyNotFound {
 			log.Debugf("Term", q[i], "does not exist in the db")
 		} else if err != nil {
-			log.Debugf("Error when querying inverted table", err)
 			panic(err)
 		}
 	
 		tempDocs := v.(map[string][]uint32)
-		idf[i] = math.Log2(float64(totalPages) / float64(len(tempDocs)))
+		idf[i] = math.Log2(totalDocs / float64(len(tempDocs)))
 
-		for j := 0; j < len(tempDocs) - 1; j ++ {
-			
-		
+		for docHash, listPos := range tempDocs {
+			tf[i]	
 		
 
 	// do stuff here

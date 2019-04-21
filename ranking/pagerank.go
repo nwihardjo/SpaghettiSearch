@@ -16,7 +16,6 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	// get the data 
 	nodesCompressed, err := forward[2].Iterate(ctx)
 	if err != nil {
-		panic(err)
 		return err
 	}
 	
@@ -69,7 +68,6 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	
 	// store to database
 	if err = saveRanking(ctx, forward[3], currentRank); err != nil {
-		panic(err)
 		return err
 	}
 	return nil

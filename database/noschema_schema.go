@@ -17,8 +17,14 @@ import (
 		key	: wordHash (type: string)
 		value	: word (type: string)
 	Schema for forward table forw[1]:
-		key:	: docHash (type: string)
+		key	: docHash (type: string)
 		value	: document info including the URL (type: DocInfo)
+	Schema for forward table forw[2]:
+		key	: docHash (type: string)
+		value	: list of children's docHash (type: []string)
+	Schema for forward table forw[3]:
+		key	: docHash (type: string)
+		value	: pageRank value (type: float64)
 ========================= MARSHAL AND UNMARSHALING =======================================
 	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
 		byteArray, err := json.Marshal(any_struct_defined_in_this_file)

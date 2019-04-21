@@ -34,11 +34,14 @@ func main() {
 	numOfPages := 500
 	maxThreadNum := 100
 	domain := "ust.hk"
+	unreachableURLs := make(map[string]bool)
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
+	errorsChannel := channels.NewInfiniteChannel()
 	var wg sync.WaitGroup
 	var wgIndexer sync.WaitGroup
 	var mutex sync.Mutex
+	var lock2 sync.RWMutex
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	log, _ := logger.New("test", 1)
@@ -95,8 +98,8 @@ func main() {
 				wg.Add(1)
 
 				/* Crawl the URL using goroutine */
-				go crawler.Crawl(idx, &wg, parentURL, currentURL,
-					client, queue, &mutex, inv, forw)
+				go crawler.Crawl(idx, &wg, parentURL, currentURL, errorsChannel,
+					client, &lock2, queue, &mutex, inv, forw)
 
 			} else {
 				os.Exit(1)
@@ -114,10 +117,19 @@ func main() {
 			stored in the database and that the parents
 			URL are already mapped to some doc id
 		*/
+		for errorsChannel.Len() > 0 {
+			if x, ok := (<-errorsChannel.Out()).(string); ok {
+				unreachableURLs[x] = true
+			} else {
+				os.Exit(1)
+			}
+		}
 		wgIndexer.Wait()
 		for cURL, parents := range parentsToBeAdded {
-			wgIndexer.Add(1)
-			go indexer.AddParent(cURL, parents, forw, &wgIndexer)
+			if !unreachableURLs[cURL] {
+				wgIndexer.Add(1)
+				go indexer.AddParent(cURL, parents, forw, &wgIndexer)
+			}
 		}
 
 		/* If finished with current depth level, proceed to the next level */
@@ -130,6 +142,7 @@ func main() {
 		}
 
 		if queue.Len() <= 0 {
+			fmt.Println("\n\n[DEBUG] QUEUE EMPTY\n\n")
 			break
 		}
 	}
@@ -139,6 +152,7 @@ func main() {
 
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
+	fmt.Println("\nTotal visited length:", len(visited))
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
 	
 	timer := time.Now()
