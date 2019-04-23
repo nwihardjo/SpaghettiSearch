@@ -1,0 +1,25 @@
+.App {
+  display: flex;
+  flex-wrap:wrap;
+  justify-content: center;
+  align-items: center;
+  width:100vw;
+  height:100vh;
+}
+.App h1{
+  font-size:5.5rem;
+}
+.searchbox--main.form-control{
+  width: 40vw;
+  min-width: 200px;
+  border-radius: 30px;
+}
+
+.searchbox--main.form-control:focus{
+  box-shadow: 3px 10px;
+  border-color: #101010;
+}
+.searchbox--main.form-control:hover{
+  box-shadow: 5px 10px;
+  border-color: #101010;
+}

@@ -49,17 +49,17 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		} else if err != nil {
 			panic(err)
 		}
-	
+
 		tempDocs := v.(map[string][]uint32)
 		idf[i] = math.Log2(totalDocs / float64(len(tempDocs)))
 
-		for docHash, listPos := range tempDocs {
-			tf[i]	
-		
+		// for docHash, listPos := range tempDocs {
+		// 	tf[i]
+	}
 
 	// do stuff here
 	// ret should be the list of the doc returned
-	json.NewEncoder(w).Encode(ret)	
+	json.NewEncoder(w).Encode(ret)
 }
 
 func main() {
@@ -76,8 +76,8 @@ func main() {
 	}
 	for _, bdb := range forw {
 		defer bdb.Close(ctx, cancel)
-	}	
-	
+	}
+
 	// start server
 	router := mux.NewRouter()
 	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
