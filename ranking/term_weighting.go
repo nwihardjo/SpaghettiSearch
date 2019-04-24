@@ -1,5 +1,5 @@
 package ranking
-/*
+
 import (
 	"encoding/json"
 	"math"
@@ -9,40 +9,40 @@ import (
 	"context"
 )
 
-type tableHolder struct {
-	Key	string
-	Val	map[string][]uint32
-}
-
-
-func Compute_tfidf(ctx context.Context, forw []db.DB, inv []db.DB) error {
+func Compute_idf(ctx context.Context, inv db.DB) {
+	// calculate number of webpages indexed based on saved html
 	var totalDocs float64
 	if cachedWebpages, err := ioutil.ReadDir(indexer.DocsDir); err != nil {
-		return err
+		panic(err)
 	} else {
 		totalDocs = float64(len(cachedWebpages))
 	}
 
-	comp, err := inv[0].Iterate(ctx)
+	bw := inv.BatchWrite_init(ctx)
+	defer bw.Cancel(ctx)
+
+	comp, err := inv.Iterate(ctx)
 	if err != nil {
-		return 
+		panic(err)
 	}
 	
-	// initialise storage holder for each inverted table
-	KV := make([]tableHolder, len(comp.KV))
-	for i := 1; i <= len(comp.KV); i++ {
-		KV[i].Key = string(comp.KV[i].Key)
-		if err = json.Unmarshal(comp.KV[i].Value, &(KV[i].Val)); err != nil {
-			return err 
+	// for each item in the database, compute idf based on totalDocs and number of docs
+	for i := 0; i < len(comp.KV); i++ {
+		key := string(comp.KV[i].Key)
+		var val map[string][]float32
+		if err = json.Unmarshal(comp.KV[i].Value, &val); err != nil {
+			panic(err)
 		}
 
-		for k, v := range KV[i].Val {
-		}			
-
-		// add idf
-		KV[i].Val["idf"] = math.Log2(totalDocs / float64(len(KV[i].Val)))
+		val["idf"] = []float32{float32(math.Log2(totalDocs / float64(len(val))))}
+		
+		if err = bw.BatchSet(ctx, key, val); err != nil {
+			panic(err)
+		}
+	}
+	if err = bw.Flush(ctx); err != nil {
+		panic(err)
 	}
 
-	return nil
+	return
 }
-*/

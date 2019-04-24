@@ -23,19 +23,16 @@ var log *logger.Logger
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	query := params["terms"]
+	// TODO: whether below is necessary
 	if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
 		panic(err)
 	}
 
-	var totalDocs float64
-	if cachedWebpages, err := ioutil.ReadDir(indexer.DocsDir); err != nil {
-		panic(err)
-	} else {
-		totalDocs = float64(len(cachedWebpages))
-	}
+	log.Print("Querying terms:", query)
+	queryTokenised := parser.Laundry(query)
 
-	log.Debugf("Querying terms:", query)
-	q := parser.Laundry(query)
+
+
 
 	docs := make([]db.DocInfo, 0, 50)
 	docsRank := make([]float64, 0, 50)

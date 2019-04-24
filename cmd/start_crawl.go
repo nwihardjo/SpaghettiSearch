@@ -155,7 +155,11 @@ func main() {
 	fmt.Println("\nTotal visited length:", len(visited))
 	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
 	
+	// perform database update
 	timer := time.Now()
-	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw) 
-	fmt.Println("Updating pagerank (including read and write to db) takes", time.Since(timer))
+	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw)
+	ranking.Compute_idf(ctx, inv[0])
+	ranking.Compute_idf(ctx, inv[1])
+	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
+
 }

@@ -37,7 +37,6 @@ type (
 	// TODO: add logger debug in each function
 	DB interface {
 		// TODO: integrate prefix search
-
 		// return nil if key not found
 		Get(ctx context.Context, key interface{}) (value interface{}, err error)
 
@@ -199,7 +198,7 @@ func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	opts.Dir, opts.ValueDir = dir, dir
 
 	// if false, SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
-	opts.SyncWrites = true
+	opts.SyncWrites = false
 
 	// loadMethod: default is MemoryMap, 1 for loading to memory (LoadToRAM), 2 for storing all into disk (FileIO) which resulted in extensive disk IO
 	switch loadMethod {

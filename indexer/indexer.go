@@ -307,13 +307,15 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 				panic(err)
 			}
 		}
+		if err = forward[2].Set(ctx, docHashString, kids); err != nil {
+			panic(err)
+		}
 	}
 
 	// Save children data into the db
 	if err = bw_child.Flush(ctx); err != nil {
 		panic(err)
 	}
-
 
 	// PageInfo
 	// Initialize document object
