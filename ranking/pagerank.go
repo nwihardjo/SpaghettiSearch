@@ -10,14 +10,13 @@ import (
 // table 1 key: docHash (type: string) value: list of child (type: []string)
 // table 2 key: docHash (type: string) value: ranking (type: float64)
 
-func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB) error {
-	log.Printf("Ranking with damping factor='%f', epsilon='%f'", dampingFactor, convergenceCriterion)
+func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB) {
+	log.Printf("Ranking with damping factor='%f', convergence_criteria='%f'", dampingFactor, convergenceCriterion)
 	
 	// get the data 
 	nodesCompressed, err := forward[2].Iterate(ctx)
 	if err != nil {
 		panic(err)
-		return err
 	}
 	
 	// extract the data from stream
@@ -66,13 +65,11 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	
 		log.Printf("Pagerank iteration #%d delta=%f", iteration, lastChange)
 	}
-	
 	// store to database
 	if err = saveRanking(ctx, forward[3], currentRank); err != nil {
 		panic(err)
-		return err
 	}
-	return nil
+	return
 }
 
 func computeRankInherited(currentRank map[string]float64, lastRank map[string]float64, dampingFactor float64, webNodes map[string][]string) {

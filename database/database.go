@@ -37,7 +37,6 @@ type (
 	// TODO: add logger debug in each function
 	DB interface {
 		// TODO: integrate prefix search
-
 		// return nil if key not found
 		Get(ctx context.Context, key interface{}) (value interface{}, err error)
 
@@ -104,6 +103,8 @@ refer to `noschema_schema.go` for each table's key and value data types
 		inv[1]: inverted table for keywords in body section
 		forw[0]: forward table for wordHash (wordId) to word mapping
 		forw[1]: forward table for docHash (docId) to DocInfo mapping
+		forw[2]: forward table for docHash to list of its child
+		forw[3]: forward table for docHash to pageRank value
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, err error) {
@@ -115,8 +116,8 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 
 	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement
 	inverted := [][]string{
-		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
-		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
+		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
+		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
 	}
 
 	forward := [][]string{
@@ -197,7 +198,7 @@ func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	opts.Dir, opts.ValueDir = dir, dir
 
 	// if false, SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
-	opts.SyncWrites = true
+	opts.SyncWrites = false
 
 	// loadMethod: default is MemoryMap, 1 for loading to memory (LoadToRAM), 2 for storing all into disk (FileIO) which resulted in extensive disk IO
 	switch loadMethod {

@@ -14,14 +14,14 @@ var stopWords = make(map[string]bool)
 type Term struct {
 	Content string
   Freq map[string]uint32
-  Pos map[string][]uint32
+  Pos map[string][]float32
 }
 
 func Parse(doc []byte) (titleInfo Term, bodyInfo Term) {
   title, words := tokenize(doc)
   // Clean terms in title and body
-  cleanTitle := laundry(title)
-  cleanBody := laundry(strings.Join(words, " "))
+  cleanTitle := Laundry(title)
+  cleanBody := Laundry(strings.Join(words, " "))
 
   // Get frequency and positions of each term
   // in title and body
@@ -79,7 +79,7 @@ func isStopWord(s string) (isStop bool) {
 	return
 }
 
-func laundry(s string) (c []string) {
+func Laundry(s string) (c []string) {
 	// remove all special characters
 	regex := regexp.MustCompile("[^a-zA-Z0-9]")
 	s = regex.ReplaceAllString(s, " ")
@@ -97,11 +97,11 @@ func laundry(s string) (c []string) {
 	return
 }
 
-func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string][]uint32) {
+func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string][]float32) {
 	termFreq = make(map[string]uint32)
-	termPos = make(map[string][]uint32)
+	termPos = make(map[string][]float32)
 	for pos, word := range words {
-		termPos[word] = append(termPos[word], uint32(pos))
+		termPos[word] = append(termPos[word], float32(pos))
 		termFreq[word] = termFreq[word] + 1
 	}
 	return

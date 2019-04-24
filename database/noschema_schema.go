@@ -17,8 +17,14 @@ import (
 		key	: wordHash (type: string)
 		value	: word (type: string)
 	Schema for forward table forw[1]:
-		key:	: docHash (type: string)
+		key	: docHash (type: string)
 		value	: document info including the URL (type: DocInfo)
+	Schema for forward table forw[2]:
+		key	: docHash (type: string)
+		value	: list of children's docHash (type: []string)
+	Schema for forward table forw[3]:
+		key	: docHash (type: string)
+		value	: pageRank value (type: float64)
 ========================= MARSHAL AND UNMARSHALING =======================================
 	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
 		byteArray, err := json.Marshal(any_struct_defined_in_this_file)
@@ -162,8 +168,8 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val, err = []byte(strconv.FormatFloat(tempVal, 'f', -1, 64)), nil
-		case "map[string][]uint32":
-			tempVal, ok := v.(map[string][]uint32)
+		case "map[string][]float32":
+			tempVal, ok := v.(map[string][]float32)
 			if !ok {
 				return nil, nil, ErrValTypeNotMatch
 			}
@@ -197,8 +203,8 @@ func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 		return tempVal, nil
 	case "float64":
 		return strconv.ParseFloat(string(v), 64)
-	case "map[string][]uint32":
-		tempVal := make(map[string][]uint32)
+	case "map[string][]float32":
+		tempVal := make(map[string][]float32)
 		err = json.Unmarshal(v, &tempVal)
 		if err != nil {
 			return nil, err
