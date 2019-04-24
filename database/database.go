@@ -117,8 +117,8 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 
 	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement
 	inverted := [][]string{
-		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
-		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
+		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
+		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
 	}
 
 	forward := [][]string{

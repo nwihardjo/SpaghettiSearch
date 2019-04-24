@@ -168,8 +168,8 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val, err = []byte(strconv.FormatFloat(tempVal, 'f', -1, 64)), nil
-		case "map[string][]uint32":
-			tempVal, ok := v.(map[string][]uint32)
+		case "map[string][]float32":
+			tempVal, ok := v.(map[string][]float32)
 			if !ok {
 				return nil, nil, ErrValTypeNotMatch
 			}
@@ -203,8 +203,8 @@ func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 		return tempVal, nil
 	case "float64":
 		return strconv.ParseFloat(string(v), 64)
-	case "map[string][]uint32":
-		tempVal := make(map[string][]uint32)
+	case "map[string][]float32":
+		tempVal := make(map[string][]float32)
 		err = json.Unmarshal(v, &tempVal)
 		if err != nil {
 			return nil, err

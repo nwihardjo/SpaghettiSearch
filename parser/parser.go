@@ -14,7 +14,7 @@ var stopWords = make(map[string]bool)
 type Term struct {
 	Content string
   Freq map[string]uint32
-  Pos map[string][]uint32
+  Pos map[string][]float32
 }
 
 func Parse(doc []byte) (titleInfo Term, bodyInfo Term) {
@@ -97,11 +97,11 @@ func Laundry(s string) (c []string) {
 	return
 }
 
-func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string][]uint32) {
+func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string][]float32) {
 	termFreq = make(map[string]uint32)
-	termPos = make(map[string][]uint32)
+	termPos = make(map[string][]float32)
 	for pos, word := range words {
-		termPos[word] = append(termPos[word], uint32(pos))
+		termPos[word] = append(termPos[word], float32(pos))
 		termFreq[word] = termFreq[word] + 1
 	}
 	return

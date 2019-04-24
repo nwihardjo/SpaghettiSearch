@@ -41,10 +41,10 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	// Get Last Modified from DB
 	var dI database.DocInfo
 	dI_, err := forward[1].Get(ctx, docHashString)
-	checkIndex := true 
-	updateTitle := true
-	updateBody := true
-	updateKids := true
+	checkIndex := false 
+	updateTitle := false
+	updateBody := false
+	updateKids := false
 	if err == nil {
 		dI, ok := dI_.(database.DocInfo)
 		if !ok {
@@ -355,11 +355,12 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	}
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, maxFreq uint32, docHash string, forward []database.DB, inverted database.DB, bw_forward []database.BatchWriter, bw_inverted database.BatchWriter, mutex *sync.Mutex) {
+func setInverted(ctx context.Context, word string, pos map[string][]float32, maxFreq uint32, docHash string, forward []database.DB, inverted database.DB, bw_forward []database.BatchWriter, bw_inverted database.BatchWriter, mutex *sync.Mutex) {
 
 	// initialise inverted keywords values
-	invKeyVals := make(map[string][]uint32)
-	invKeyVals[docHash] = append([]uint32{0}, pos[word]...)
+	invKeyVals := make(map[string][]float32)
+	normTF := float32(len(pos[word])) / float32(maxFreq)
+	invKeyVals[docHash] = append([]float32{normTF}, pos[word]...)
 
 	// Compute the wordHash of current word
 	wordHash := md5.Sum([]byte(word))
@@ -395,7 +396,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, maxF
 		panic(err)
 	} else {
 		// append new docHash entry to the existing one
-		value.(map[string][]uint32)[docHash] = append(value.(map[string][]uint32)[docHash], pos[word]...)
+		value.(map[string][]float32)[docHash] = invKeyVals[docHash]
 
 		// load new appended value of inverted table according to the wordHash
 		if err = bw_inverted.BatchSet(ctx, wordHashString, value); err != nil {

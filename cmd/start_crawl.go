@@ -31,7 +31,7 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk"
-	numOfPages := 500
+	numOfPages := 300
 	maxThreadNum := 100
 	domain := "ust.hk"
 	unreachableURLs := make(map[string]bool)
