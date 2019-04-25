@@ -35,7 +35,7 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	currentRank := make(map[string]float64, n)
 	lastRank := make(map[string]float64, n)
 
-	teleportProbs := (1.0 - dampingFactor) / float64(n)
+	teleportProbs := 1.0 - dampingFactor
 
 	// perform several computation until convergence is ensured
 	for iteration, lastChange := 1, math.MaxFloat64; lastChange > convergenceCriterion; iteration++ {
@@ -48,18 +48,25 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 			}
 		} else {
 			// base case: everything is uniform
+			if iteration == 1 {
+				for docHash, _ := range webNodes {
+					lastRank[docHash] = 1.0 / float64(n)
+				}
+			}
+
 			for  docHash, _ := range webNodes {
 				currentRank[docHash] = 1.0 / float64(n)
 			}
 		}
 
-		// perform single power iteration, pass by reference
-		computeRankInherited(currentRank, lastRank, dampingFactor, webNodes)
+		// perform single power iteration, pass by reference. Get totalValue for normalisation
+		totalValue := computeRankInherited(currentRank, lastRank, dampingFactor, webNodes)
+		totalValue += (teleportProbs * float64(len(currentRank)))
 
-		// calculate last change for to convergence assesment based on L1
+		// calculate last change for to convergence assesment based on L1 norm
 		lastChange = 0.0
 		for docHash, _ := range webNodes {
-			currentRank[docHash] += teleportProbs
+			currentRank[docHash] = (currentRank[docHash] + teleportProbs) / totalValue
 			lastChange += math.Abs(currentRank[docHash] - lastRank[docHash])
 		}
 	
@@ -72,17 +79,25 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	return
 }
 
-func computeRankInherited(currentRank map[string]float64, lastRank map[string]float64, dampingFactor float64, webNodes map[string][]string) {
+func computeRankInherited(currentRank map[string]float64, lastRank map[string]float64, dampingFactor float64, webNodes map[string][]string) float64{
+	totalValue := 0.0
+
 	// perform single power iteration --> d*(PR(parent)/CR(parent))
 	for parentHash, _ := range currentRank {
+		// web with no child
+		if len(webNodes[parentHash]) == 0 {
+			continue
+		}
+		
 		weightPassedDown := dampingFactor * lastRank[parentHash] / float64(len(webNodes[parentHash]))
-	
+		totalValue += weightPassedDown
+
 		// add child's rank with the weights passed down
 		for _, childHash := range webNodes[parentHash] {
 			currentRank[childHash] += weightPassedDown
 		}
 	}
-	return
+	return totalValue
 }
 
 func saveRanking(ctx context.Context, table db.DB, currentRank map[string]float64) (err error) {
