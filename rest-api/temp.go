@@ -40,25 +40,28 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		Parents: tempParents,
 		Words_mapping: temp1,
 	}
-	ret:= {
-		// `data` is the response that was provided by the server
-		data: {doc2},
-		// `status` is the HTTP status code from the server response
-		status: 200,
-		// `statusText` is the HTTP status message from the server response
-		statusText: 'OK',
-		// `headers` the headers that the server responded with
-		// All header names are lower cased
-		headers: {},
-		// `config` is the config that was provided to `axios` for the request
-		config: {},
-		// `request` is the request that generated this response
-		// It is the last ClientRequest instance in node.js (in redirects)
-		// and an XMLHttpRequest instance the browser
-		request: {}
-	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	// ret:= {
+	// 	// `data` is the response that was provided by the server
+	// 	data: {doc2},
+	// 	// `status` is the HTTP status code from the server response
+	// 	status: 200,
+	// 	// `statusText` is the HTTP status message from the server response
+	// 	statusText: 'OK',
+	// 	// `headers` the headers that the server responded with
+	// 	// All header names are lower cased
+	// 	headers: {},
+	// 	// `config` is the config that was provided to `axios` for the request
+	// 	config: {},
+	// 	// `request` is the request that generated this response
+	// 	// It is the last ClientRequest instance in node.js (in redirects)
+	// 	// and an XMLHttpRequest instance the browser
+	// 	request: {}
+	// }
 
-	// ret := []db.DocInfo{doc1, doc2}
+	ret := []db.DocInfo{doc1, doc2}
 	json.NewEncoder(w).Encode(ret)
 }
 
