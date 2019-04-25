@@ -139,7 +139,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 				if e != nil {
 					panic(e)
 				}
-				docP, ok := docP_.(map[string][]uint32)
+				docP, ok := docP_.(map[string][]float32)
 				if !ok {
 					panic("Type assertion failed")
 				}
@@ -169,7 +169,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 				if e != nil {
 					panic(e)
 				}
-				docP, ok := docP_.(map[string][]uint32)
+				docP, ok := docP_.(map[string][]float32)
 				if !ok {
 					panic("Type assertion failed")
 				}

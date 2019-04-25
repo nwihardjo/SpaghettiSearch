@@ -13,6 +13,7 @@ import (
 	"math"
 	db "the-SearchEngine/database"
 	"io/ioutil"
+	"sync"
 )
 
 // global declaration used in db
@@ -31,8 +32,11 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	log.Print("Querying terms:", query)
 	queryTokenised := parser.Laundry(query)
 
-
-
+	var wg sync.WaitGroup
+	chanDocHash := make(chan string)
+	for term := range queryTokenised {
+		wg.Add(1)
+		go getQuery(chanDocHash, 
 
 	docs := make([]db.DocInfo, 0, 50)
 	docsRank := make([]float64, 0, 50)
