@@ -31,7 +31,7 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk"
-	numOfPages := 300
+	numOfPages := 10
 	maxThreadNum := 100
 	domain := "ust.hk"
 	unreachableURLs := make(map[string]bool)
@@ -153,13 +153,14 @@ func main() {
 	/* Wait for all indexers to finish */
 	wgIndexer.Wait()
 	fmt.Println("\nTotal visited length:", len(visited))
-	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	fmt.Println("\nTotal crawling and indexing time: " + time.Now().Sub(start).String())
 	
 	// perform database update
 	timer := time.Now()
 	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw)
-	ranking.Compute_idf(ctx, inv[0])
-	ranking.Compute_idf(ctx, inv[1])
-	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
+	ranking.UpdateTermWeights(ctx, &inv[0], &forw[4], "title")
+	ranking.UpdateTermWeights(ctx, &inv[1], &forw[4], "body")
 
+	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
+	fmt.Println("\nTotal elapsed time: " ,time.Now().Sub(start).String())
 }

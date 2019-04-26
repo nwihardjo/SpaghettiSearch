@@ -10,6 +10,7 @@ import (
 
 /*
 =============================== SCHEMA DEFINITION ==========================================
+
 	Schema for inverted table for both body and title page schema:
 		key	: wordHash (type: string)
 		value	: map of docHash to list of positions (type: map[string][]uint32)
@@ -25,21 +26,12 @@ import (
 	Schema for forward table forw[3]:
 		key	: docHash (type: string)
 		value	: pageRank value (type: float64)
-========================= MARSHAL AND UNMARSHALING =======================================
-	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
-		byteArray, err := json.Marshal(any_struct_defined_in_this_file)
-	To cast back into the desired data type, use Unmarshal operation
-		byteArray, err := tableObject.Get(some_context, key_in_byteArray)
-		var a desired_datatype
-		err = json.Unmarshal(byteArray, &a)
-	For url.URL data type, use command below to both encode it into array of byte and vice versa
-		urlObject, err := url.Parse(url_in_string)
-		byteArray, err := urlObject.MarshalBinary()
-		tempUrl := &url.URL{}
-		err := tempUrl.UnmarshalBinary(byteArray)
+	Schema for forward table forw[4]:
+		key	: docHash (type: string)
+		value	: page magnitude (type: map[string]float64)
+
 */
 
-// NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
 	Url           url.URL           `json:"Url"`
@@ -174,6 +166,12 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val, err = json.Marshal(tempVal)
+		case "map[string]float64":
+			tempVal, ok := v.(map[string]float64)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
+			val, err = json.Marshal(tempVal)
 		case "DocInfo":
 			tempVal, ok := v.(DocInfo)
 			if !ok {
@@ -205,6 +203,13 @@ func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 		return strconv.ParseFloat(string(v), 64)
 	case "map[string][]float32":
 		tempVal := make(map[string][]float32)
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil {
+			return nil, err
+		}
+		return tempVal, nil
+	case "map[string]float64":
+		tempVal := make(map[string]float64)
 		err = json.Unmarshal(v, &tempVal)
 		if err != nil {
 			return nil, err

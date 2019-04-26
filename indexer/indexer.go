@@ -97,7 +97,6 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 
 	// Init batch writer for modified handler
 	var bwFrw []database.BatchWriter
-	var bwFrw []database.BatchWriter
 	var bwInv []database.BatchWriter
 
 	for _, i := range forward {
@@ -137,96 +136,6 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		checkAndUpdate(&dI, pageTitle, kids, lock2, docHashString,
 			bwInv, bwFrw, wordMapping, pageSize, inverted, forward,
 			ctx, &updateTitle, &updateBody, &updateKids)
-	}
-
-	// If the doc exists and there is no changes, return
-	if checkIndex && !updateTitle && !updateBody && !updateKids {
-		fmt.Println("\n\n[DEBUG] Checked, no update\n\n")
-		return
-	}
-
-	// initiate batch object
-	var batchWriter_forward []database.BatchWriter
-	var batchWriter_inverted []database.BatchWriter
-
-	for _, i := range forward {
-		temp := i.BatchWrite_init(ctx)
-		defer temp.Cancel(ctx)
-		batchWriter_forward = append(batchWriter_forward, temp)
-	}
-	for _, i := range inverted {
-		temp := i.BatchWrite_init(ctx)
-		defer temp.Cancel(ctx)
-		batchWriter_inverted = append(batchWriter_inverted, temp)
-	}
-
-	lock2.RLock()
-	// if current doc is not found or if the new title is different from the old one,
-	// process and load data to batch writer for inverted tables
-	// map word to wordHash as well if not exist
-	if !checkIndex || updateTitle {
-		maxFreq := getMaxFreq(titleInfo.Freq)
-		for word, _ := range titleInfo.Pos {
-			// save from title wordHash -> [{DocHash, Positions}]
-			setInverted(ctx, word, titleInfo.Pos, maxFreq, docHashString, forward, inverted[0], batchWriter_forward, batchWriter_inverted[0], mutex)
-		}
-	}
-
-	if !checkIndex || updateBody {
-		maxFreq := getMaxFreq(bodyInfo.Freq)
-		for word, _ := range bodyInfo.Pos {
-			// save from body wordHash-> [{DocHash, Positions}]
-			setInverted(ctx, word, bodyInfo.Pos, maxFreq, docHashString, forward, inverted[1], batchWriter_forward, batchWriter_inverted[1], mutex)
-		}
-	}
-	lock2.RUnlock()
-
-	// write the key-value pairs set on batch write. If no value is to be flushed, it'll return nil
-	for _, f := range batchWriter_forward {
-		if err = f.Flush(ctx); err != nil {
-			panic(err)
-		}
-	}
-	for _, i := range batchWriter_inverted {
-		if err = i.Flush(ctx); err != nil {
-			panic(err)
-		}
-	}
-
-	// initialise batch writer for child append
-	bw_child := forward[1].BatchWrite_init(ctx)
-	defer bw_child.Cancel(ctx)
-
-	if !checkIndex || updateKids {
-		for idx, kid := range kids {
-			// Get DocInfo corresponding to the child,
-			// make one if not present (for the sake of getting the url of not-yet-visited child)
-			docInfoC, err := forward[1].Get(ctx, kid)
-			if err == badger.ErrKeyNotFound {
-				docInfoC = database.DocInfo{*kidUrls[idx], nil, time.Time{}, 0, nil, []string{kid}, nil}
-
-				// Set docHash of child -> docInfo of child using batch writer
-				if err = bw_child.BatchSet(ctx, kid, docInfoC); err != nil {
-					panic(err)
-				}
-			} else if err != nil {
-				panic(err)
-			}
-		}
-
-		// Store the children of current doc to db for faster pagerank process
-		if err = forward[2].Set(ctx, docHashString, kids); err != nil {
-			panic(err)
-		}
-	}
-
-	// Save children data into the db
-	if err = bw_child.Flush(ctx); err != nil {
-		panic(err)
-	}
-
-	// PageInfo
-	// Initialize document object
 	}
 
 	// If the doc exists and there is no changes, return

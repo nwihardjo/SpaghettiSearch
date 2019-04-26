@@ -14,6 +14,8 @@ import (
 	db "the-SearchEngine/database"
 	"io/ioutil"
 	"sync"
+	"encoding/hex"
+	"crypto/md5"
 )
 
 // global declaration used in db
@@ -36,14 +38,34 @@ func generateAggrDocsPipeline(docRank map[string]Rank_term) <- chan Rank_result 
 	out := make(chan Rank_result, len(docRank))
 	go func() {
 		for docHash, rank := range docRank {
-			bodyRank := 
+			ret := Rank_result{DocHash: docHash, }
+			for titleweight := range rank.TitleWeights {
+				ret.TitleRank += float64(titleweight)
+			}
+			for bodyweight := range rank.BodyWeights {
+				ret.BodyRank += float64(bodyweight)
+			}
 
+			out <- ret
+		}
+		close(out)
+	}()
+	return out
+}
+
+// several type for easier flow of channels
 type Rank_term struct (
-	TitleRank	[]float32
-	BodyRank	[]float32
+	TitleWeights	[]float32
+	BodyWeights	[]float32
 )
 
 type Rank_result struct (
+	DocHash		string
+	TitleRank	float64
+	BodyRank	float64
+)
+
+type Rank_combined struct (
 	DocHash	string
 	Rank	float64
 )
@@ -69,15 +91,17 @@ func getFromInverted(ctx context.Context, termChan <-chan string, inv []db.DB) <
 			// merge document retrieved from inverted tables, and calculate norm_tf*idf
 			ret := make(map[string]Rank_term)
 			for docHash, listPos := range bodyResult {
+				// first entry of the listPos is norm_tf*idf
 				ret[docHash] = Rank_term{
-					TitleRank: nil,
-					BodyRank : []float32{listPos[0] * bodyResult["idf"][0]},
+					TitleWeights: nil,
+					BodyWeights : []float32{listPos[0]},
 				}
 			}
 			
 			for docHash, listPos := range titleResult {
 				tempVal := ret[docHash]
-				tempVal.TitleRank = []float32{listPos[0] * bodyResult["idf"][0]}
+				// first entry of the listPos is norm_tf*idf
+				tempVal.TitleWeights = []float32{listPos[0]}
 				ret[docHash] = tempVal
 			}
 			
@@ -112,6 +136,13 @@ func fanInDocs(docsIn ... <-chan map[string]Rank_term) <- chan map[string]Rank_t
 	return c
 }
 
+func getMagnitudeAndPR(ctx context.Context, docs <- chan Rank_result, forw db.DB) <- chan Rank_final {
+	out := make(chan Rank_final)
+	go func() {
+		for doc := range docs {
+				
+	
+
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	query := params["terms"]
@@ -122,18 +153,23 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 
 	log.Print("Querying terms:", query)
 	queryTokenised := parser.Laundry(query)
-	
+
+	// convert to wordHash
+	for i := 0; i < len(queryTokenised); i++ {
+		queryTokenised[i] := hex.EncodeToString(md5.Sum([]byte(queryTokenised[i]))[:])
+	}
+
 	// generate common channel with inputs
 	termInChan := generatePipeline(queryTokenised)
 
-	// fan-out to several goroutines
+	// fan-out to get term occurence from inverted tables
 	numFanOut := math.Ceil(len(queryTokenised) * 0.75)
 	termOutChan := make([] <-chan map[string]Rank_term, numFanOut)
 	for i := 0; i < numFanOut; i ++ {
-		termOut[i] = getFromInverted(ctx, termChan, inv)
+		termOutChan[i] = getFromInverted(ctx, termInChan, inv)
 	}
 	
-	// fan-in the result and aggregate the result
+	// fan-in the result and aggregate the result based on generator model
 	// docsMatched has type map[string]Rank_term
 	aggregatedDocs := make(map[string]Rank_term)
 	for docsMatched := range fanInDocs(termOutChan...) {
@@ -144,8 +180,19 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		}
 	}	
 
+
+
 	// common channel for inputs of final ranking calculation
-	docsInChan := generatePipeline(
+	docsInChan := generateAggrDocsPipeline(aggregatedDocs)
+
+	// fan-out to get PR and page magnitude
+	numFanOut = math.Ceil(len(aggregatedDocs)* 0.75)
+	docsOutChan := make([] <- chan Rank_final, len(aggregatedDocs))
+	for i := 0; i < numFanOut; i++ {
+		docsOutChan[i] = getMagnitudeAndPR(ctx, docsInChan, forw)
+	}
+		
+
 
 	// ret should be the list of the doc returned
 	json.NewEncoder(w).Encode(ret)	

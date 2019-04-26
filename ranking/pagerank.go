@@ -111,9 +111,5 @@ func saveRanking(ctx context.Context, table db.DB, currentRank map[string]float6
 		}
 	}
 	
-	if err = bw.Flush(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return bw.Flush(ctx)
 }
