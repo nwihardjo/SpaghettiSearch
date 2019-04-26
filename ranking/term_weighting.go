@@ -27,7 +27,7 @@ func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string
 		panic(err)
 	}
 	
-	pageMagnitude := make(map[string]float64, len(comp.KV))
+	pageMagnitude := make(map[string]float64, int(totalDocs))
 	
 	// iterate through each row in table to compute tf-idf
 	for i := 0; i < len(comp.KV); i++ {
@@ -45,7 +45,7 @@ func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string
 			// first entry of list position is normalised tf
 			listPos[0] *= idf
 			val[docHash] = listPos
-			pageMagnitude[docHash] += float64(listPos[0])
+			pageMagnitude[docHash] += float64(listPos[0] * listPos[0])
 		}
 		
 		if err = bw.BatchSet(ctx, key, val); err != nil {
@@ -73,7 +73,41 @@ func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *
 		defer bw.Cancel(ctx)
 		
 		for docHash, magnitude := range pageMagnitude {
-			if err = bw.BatchSet(ctx, docHash, map[string]float64{info: magnitude}); err != nil {
+			if err = bw.BatchSet(ctx, docHash, map[string]float64{info: math.Sqrt(magnitude)}); err != nil {
+				panic(err)
+			}
+		}
+
+		if err = bw.Flush(ctx); err != nil {
+			panic(err)
+		}
+
+		return
+	} else {
+		// it is assumed that every webpage has body as well as title
+		// container for key-value pair to be batch written
+		key := make([]string, len(comp.KV))
+		val := make([]map[string]float64, len(comp.KV))
+
+		// append value for existing db
+		for i := 0; i < len(comp.KV); i++ {
+			key[i] = string(comp.KV[i].Key)
+			var tempVal magnitudeValue
+			if err = json.Unmarshal(comp.KV[i].Value, &tempVal); err != nil {
+				panic(err)
+			}
+			
+			// append provided magnitude to the value of the table
+			tempVal[info] = math.Sqrt(pageMagnitude[key[i]])
+			val[i] = tempVal
+		}
+
+		// batch write to db 
+		bw := (*forw).BatchWrite_init(ctx)
+		defer bw.Cancel(ctx)
+		
+		for i := 0; i < len(key); i++ {
+			if err = bw.BatchSet(ctx, key[i], val[i]); err != nil {
 				panic(err)
 			}
 		}
@@ -83,36 +117,4 @@ func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *
 		}
 		return
 	}
-
-	// container for key-value pair to be batch written
-	key := make([]string, len(comp.KV))
-	val := make([]map[string]float64, len(comp.KV))
-
-	// append value for existing db
-	for i := 0; i < len(comp.KV); i++ {
-		key[i] = string(comp.KV[i].Key)
-		var tempVal magnitudeValue
-		if err = json.Unmarshal(comp.KV[i].Value, &tempVal); err != nil {
-			panic(err)
-		}
-		
-		// append provided magnitude to the value of the table
-		tempVal[info] = pageMagnitude[key[i]]
-		val[i] = tempVal
-	}
-
-	// batch write to db 
-	bw := (*forw).BatchWrite_init(ctx)
-	defer bw.Cancel(ctx)
-	
-	for i := 0; i < len(key); i++ {
-		if err = bw.BatchSet(ctx, key[i], val[i]); err != nil {
-			panic(err)
-		}
-	}
-
-	if err = bw.Flush(ctx); err != nil {
-		panic(err)
-	}
-	return
 }
