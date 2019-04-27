@@ -16,7 +16,8 @@ import (
 	"github.com/dgraph-io/badger"
 	"crypto/md5"
 	"strings"
-	"fmt"
+	"net/url"
+	"time"
 )
 
 // global declaration used in db
@@ -65,20 +66,19 @@ type Rank_result struct {
 }
 
 type Rank_combined struct {
-	DocHash	string `json:"DocHash"` 
-	Rank	float64 `json:"Rank"`
-}
-
-func (u Rank_combined) MarshalJSON() ([]byte, error) {
-	b := struct {
-		DocHash string `json:"DocHash"`
-		Rank	float64 `json:"Rank"`
-	}{u.DocHash, u.Rank}
-	return json.Marshal(b)
+	Url           url.URL           `json:"Url"`
+	Page_title    []string          `json:"Page_title"`
+	Mod_date      time.Time         `json:"Mod_date"`
+	Page_size     uint32            `json:"Page_size"`
+	Children      []string          `json:"Children"`
+	Parents       []string          `json:"Parents"`
+	Words_mapping map[string]uint32 `json:"Words_mapping"`
+	PageRank      float64		`json:"PageRank"`
+	FinalRank     float64		`json:"FinalRank"`
 }
 
 func appendSort(data []Rank_combined, el Rank_combined) []Rank_combined {
-	index := sort.Search(len(data), func(i int) bool { return data[i].Rank < el.Rank })
+	index := sort.Search(len(data), func(i int) bool { return data[i].FinalRank < el.FinalRank })
 	data = append(data, Rank_combined{})
 	copy(data[index+1:], data[index:])
 	data[index] = el
@@ -176,10 +176,13 @@ func fanInResult(docRankIn []<-chan Rank_combined) <- chan Rank_combined {
 	return c
 }
 
-func getMagnitudeAndPR(ctx context.Context, docs <- chan Rank_result, forw []db.DB, queryLength int) <- chan Rank_combined {
+func computeFinalRank(ctx context.Context, docs <- chan Rank_result, forw []db.DB, queryLength int) <- chan Rank_combined {
 	out := make(chan Rank_combined)
 	go func() {
 		for doc := range docs {
+			// get doc metadata using future pattern for faster performance
+			metadata := getDocInfo(ctx, doc.DocHash, &forw[1])
+
 			// get pagerank value
 			var PR float64
 			if tempVal, err := forw[3].Get(ctx, doc.DocHash); err != nil {
@@ -196,26 +199,55 @@ func getMagnitudeAndPR(ctx context.Context, docs <- chan Rank_result, forw []db.
 				pageMagnitude = tempVal.(map[string]float64)
 			}
 			
-			fmt.Println("DEBUG ", PR, pageMagnitude, doc.BodyRank, doc.TitleRank)
 			// compute final rank
 			queryMagnitude := math.Sqrt(float64(queryLength))
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
 			
-
-			out <- Rank_combined {
-				DocHash : doc.DocHash, 
-				Rank	: 0.4*PR + 0.4*doc.TitleRank + 0.2*doc.BodyRank,
-			}
+			// retrieve result from future
+			docMetaData := <- metadata
+			out <- resultFormat(docMetaData, PR, 0.4*PR + 0.4*doc.TitleRank + 0.2*doc.BodyRank)
 		}
 		close(out)
 	}()	
 	return out
 }		
 							
+func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combined {
+	return Rank_combined {
+		Url		:	metadata.Url,
+		Page_title	:	metadata.Page_title,
+		Mod_date	:	metadata.Mod_date,
+		Page_size	:	metadata.Page_size,
+		Children	:	metadata.Children,
+		Parents		:	metadata.Parents,
+		Words_mapping	:	metadata.Words_mapping,
+		PageRank	:	PR,
+		FinalRank	:	finalRank,
+	}
+}
 
+func getDocInfo(ctx context.Context, docHash string, forw *db.DB) <-chan db.DocInfo {
+	out := make(chan db.DocInfo, 1)
+
+	go func() {
+		var ret db.DocInfo
+		if tempVal, err := (*forw).Get(ctx, docHash); err != nil {
+			panic(err)
+		} else {
+			ret = tempVal.(db.DocInfo)
+		}
+
+		out <- ret
+	}()
+	return out
+}
 
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+
 	params := mux.Vars(r)
 	query := params["terms"]
 	// TODO: whether below is necessary
@@ -255,8 +287,6 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		}
 	}	
 
-	log.Print("DEBUG aggrDocs", aggregatedDocs)
-
 	// common channel for inputs of final ranking calculation
 	docsInChan := genAggrDocsPipeline(aggregatedDocs)
 
@@ -264,7 +294,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	numFanOut = int(math.Ceil(float64(len(aggregatedDocs))* 0.75))
 	docsOutChan := [] (<-chan Rank_combined){}
 	for i := 0; i < numFanOut; i++ {
-		docsOutChan = append(docsOutChan, getMagnitudeAndPR(ctx, docsInChan, forw, len(queryTokenised)))
+		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)))
 	}
 
 	// fan-in final rank (generator pattern) and sort the result

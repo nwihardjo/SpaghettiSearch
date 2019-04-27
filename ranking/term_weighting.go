@@ -9,8 +9,6 @@ import (
 	"context"
 )
 
-type magnitudeValue map[string]float64
-
 func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string) {
 	// calculate number of webpages indexed based on saved html
 	var totalDocs float64
@@ -92,14 +90,21 @@ func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *
 		// append value for existing db
 		for i := 0; i < len(comp.KV); i++ {
 			key[i] = string(comp.KV[i].Key)
-			var tempVal magnitudeValue
+			var tempVal map[string]float64
 			if err = json.Unmarshal(comp.KV[i].Value, &tempVal); err != nil {
 				panic(err)
 			}
 			
 			// append provided magnitude to the value of the table
 			tempVal[info] = math.Sqrt(pageMagnitude[key[i]])
+			delete(pageMagnitude, key[i])
 			val[i] = tempVal
+		}
+
+		// write some of the magnitude left
+		for docHash, magnitude := range pageMagnitude {
+			key = append(key, docHash)
+			val = append(val, map[string]float64{info: math.Sqrt(magnitude)})
 		}
 
 		// batch write to db 
