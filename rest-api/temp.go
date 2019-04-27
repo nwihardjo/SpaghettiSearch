@@ -1,7 +1,6 @@
 package main
 
 import (
-	db "the-SearchEngine/database"
 	"github.com/gorilla/mux"
 	"net/http"
 	"net/url"
@@ -10,9 +9,27 @@ import (
 	"time"
 )
 
+type docResult struct {
+	Url           url.URL           `json:"Url"`
+	Page_title    []string          `json:"Page_title"`
+	Mod_date      time.Time         `json:"Mod_date"`
+	Page_size     uint32            `json:"Page_size"`
+	Children      []string          `json:"Children"`
+	Parents       []string          `json:"Parents"`
+	Words_mapping map[string]uint32 `json:"Words_mapping"`
+	PageRank      float64		`json:"PageRank"`
+	FinalRank     float64		`json:"FinalRank"`
+}
+
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	log.Print("Querying ", params["terms"], "...")
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+
+	var query string
+	_ = json.NewDecoder(r.Body).Decode(&query)
+	log.Print("DEBUG: Querying ", query, " ...")
+	log.Print("DEBUG: ", r.Body)
 	
 	tempChild := []string{"children type","need","to","be","changed"}
 	tempParents := []string{"parent type","need","to","be","changed"}
@@ -22,7 +39,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	temp1["wordHash1"] = uint32(11)
 	temp1["wordHash2"] = uint32(22)
 	
-	doc1 := db.DocInfo {
+	doc1 := docResult {
 		Url: *temp,
 		Page_title: []string{"this", "is", "google"},
 		Mod_date: time.Now(),
@@ -30,8 +47,10 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		Children: tempChild,
 		Parents: tempParents,
 		Words_mapping: temp1,
+		PageRank: 0.52341,
+		FinalRank: 0.6879,
 	}
-	doc2 := db.DocInfo {
+	doc2 := docResult {
 		Url: *temp_,
 		Page_title: []string{"this", "is", "cse"},
 		Mod_date: time.Now(),
@@ -39,15 +58,17 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		Children: tempChild, 
 		Parents: tempParents,
 		Words_mapping: temp1,	
+		PageRank: 0.841,
+		FinalRank: 0.984,
 	}
 
-	ret := []db.DocInfo{doc1, doc2}
+	ret := []docResult{doc2, doc1}
 	json.NewEncoder(w).Encode(ret)
 }
 		
 
 func main() {
 	router := mux.NewRouter()
-	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
+	router.HandleFunc("/query", GetWebpages).Methods("POST")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

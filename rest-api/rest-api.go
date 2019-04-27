@@ -229,7 +229,6 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(queryTokenised); i++ {
 		tempHash := md5.Sum([]byte(queryTokenised[i]))
 		queryTokenised[i] = hex.EncodeToString(tempHash[:])
-		log.Print(queryTokenised[i])
 	}
 
 	// generate common channel with inputs

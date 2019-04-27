@@ -163,5 +163,4 @@ func main() {
 
 	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
 	fmt.Println("\nTotal elapsed time: " ,time.Now().Sub(start).String())
-	forw[4].Debug_Print(ctx)
 }
