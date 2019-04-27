@@ -3,6 +3,7 @@ package ranking
 import (
 	db "the-SearchEngine/database"
 	"math"
+	"encoding/json"
 	"log"
 	"context"
 )
@@ -20,17 +21,30 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	}
 	
 	// extract the data from stream
+	webNodesAll := make(map[string]struct{})
 	webNodes := make(map[string][]string, len(nodesCompressed.KV))
 	for _, kv := range nodesCompressed.KV {
-		tempVal := make([]string, len(kv.Value))
-		for index, valueBytes := range kv.Value { 
-			tempVal[index] = string(valueBytes)
+		var tempVal []string
+		if err = json.Unmarshal(kv.Value, &tempVal); err != nil {
+			panic(err)
 		}
+
+		// add childhash to list of webnodes
+		for _, childHash := range tempVal { 
+			webNodesAll[childHash] = struct{}{}
+		}
+
 		webNodes[string(kv.Key)] = tempVal
+		webNodesAll[string(kv.Key)] = struct{}{}
+	}
+
+	setWebNodes := make([]string, 0, len(webNodesAll))
+	for k, _ := range webNodesAll{
+		setWebNodes = append(setWebNodes, k)
 	}
 	
 	// use number of web nodes for more efficient memory allocation
-	n := len(webNodes)
+	n := len(setWebNodes)
 	log.Printf("number of webpages indexed %d", n)
 	currentRank := make(map[string]float64, n)
 	lastRank := make(map[string]float64, n)
@@ -43,18 +57,18 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 		
 		// clear out old values
 		if iteration > 1 {
-			for docHash, _ := range webNodes {
+			for _, docHash := range setWebNodes {
 				currentRank[docHash] = 0.0
 			}
 		} else {
 			// base case: everything is uniform
 			if iteration == 1 {
-				for docHash, _ := range webNodes {
+				for _, docHash := range setWebNodes {
 					lastRank[docHash] = 1.0 / float64(n)
 				}
 			}
 
-			for  docHash, _ := range webNodes {
+			for _, docHash := range setWebNodes {
 				currentRank[docHash] = 1.0 / float64(n)
 			}
 		}
@@ -65,8 +79,8 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 
 		// calculate last change for to convergence assesment based on L1 norm
 		lastChange = 0.0
-		for docHash, _ := range webNodes {
-			currentRank[docHash] = (currentRank[docHash] + teleportProbs) / totalValue
+		for docHash, rank := range currentRank {
+			currentRank[docHash] = (rank + teleportProbs) / totalValue
 			lastChange += math.Abs(currentRank[docHash] - lastRank[docHash])
 		}
 	

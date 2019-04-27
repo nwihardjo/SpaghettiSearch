@@ -24,7 +24,7 @@ var forw []db.DB
 var inv []db.DB
 var ctx context.Context
 
-func generateTermPipeline(listStr []string) <- chan string {
+func genTermPipeline(listStr []string) <- chan string {
 	out := make(chan string, len(listStr))
 	for i := 0; i < len(listStr); i++ {
 		out <- listStr[i]
@@ -33,15 +33,17 @@ func generateTermPipeline(listStr []string) <- chan string {
 	return out
 }
 
-func generateAggrDocsPipeline(docRank map[string]Rank_term) <- chan Rank_result {
+func genAggrDocsPipeline(docRank map[string]Rank_term) <- chan Rank_result {
 	out := make(chan Rank_result, len(docRank))
 	for docHash, rank := range docRank {
-		ret := Rank_result{DocHash: docHash, }
-		for titleweight := range rank.TitleWeights {
-			ret.TitleRank += float64(titleweight)
+		ret := Rank_result{DocHash: docHash, TitleRank: 0.0, BodyRank: 0.0,}
+
+		for i := 0; i < len(rank.TitleWeights); i++ {
+			ret.TitleRank += float64(rank.TitleWeights[i])
 		}
-		for bodyweight := range rank.BodyWeights {
-			ret.BodyRank += float64(bodyweight)
+
+		for i := 0; i < len(rank.BodyWeights); i ++ {
+			ret.BodyRank += float64(rank.BodyWeights[i])
 		}
 
 		out <- ret
@@ -232,7 +234,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate common channel with inputs
-	termInChan := generateTermPipeline(queryTokenised)
+	termInChan := genTermPipeline(queryTokenised)
 
 	// fan-out to get term occurence from inverted tables
 	numFanOut := int(math.Ceil(float64(len(queryTokenised)) * 0.75))
@@ -256,7 +258,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	log.Print("DEBUG aggrDocs", aggregatedDocs)
 
 	// common channel for inputs of final ranking calculation
-	docsInChan := generateAggrDocsPipeline(aggregatedDocs)
+	docsInChan := genAggrDocsPipeline(aggregatedDocs)
 
 	// fan-out to calculate final rank from PR and page magnitude
 	numFanOut = int(math.Ceil(float64(len(aggregatedDocs))* 0.75))
