@@ -24,7 +24,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 
 	doc1 := db.DocInfo {
 		Url: *temp,
-		Page_title: []string{"this", "is", "google"},
+		Page_title: []string{"This ", "is", " Google"},
 		Mod_date: time.Now(),
 		Page_size: uint32(10),
 		Children: tempChild,
@@ -33,7 +33,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	}
 	doc2 := db.DocInfo {
 		Url: *temp_,
-		Page_title: []string{"this", "is", "cse"},
+		Page_title: []string{"This ", "is", " CSE"},
 		Mod_date: time.Now(),
 		Page_size: uint32(1000),
 		Children: tempChild,
@@ -61,10 +61,9 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	// 	request: {}
 	// }
 
-	ret := []db.DocInfo{doc1, doc2}
+	ret := []db.DocInfo{doc1, doc2, doc1, doc2, doc1, doc2}
 	json.NewEncoder(w).Encode(ret)
 }
-
 
 func main() {
 	router := mux.NewRouter()

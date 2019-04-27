@@ -1,0 +1,7 @@
+.results {
+  padding: 20px 20px 20px 20px;
+  position: element(#searchbar);
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+}

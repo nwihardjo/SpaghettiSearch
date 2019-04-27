@@ -1,30 +1,49 @@
 import React, { Component } from 'react';
+import ResultCard from './ResultCard';
+import '../styles/Results.css';
 
 const config = require('../config/server');
 const axios = require('axios');
 
 class Results extends Component {
-  constructor () {
-    super()
-    this.state = {query: "", results:[]}
+  constructor (props) {
+    super(props);
+    this.state = {query:"", results: []}
   }
   componentDidMount (props) {
     this.setState({query: this.props.query});
-    this.getResults();
+    this.getResults(this.props.query);
   }
-  getResults = () => {
-    axios.get(config.address+'query/google', { crossdomain: true })
-    .then(function (response) {
-      console.log(response.data);
+  // getResults = (query) => {
+  //   this._getResults(query);
+  // }
+  getResults = (query) => {
+    axios.get(config.address+'query/google')
+    .then((response) => {
+      console.log(query, response.data);
+      this.setState({query: query, results: response.data});
     })
-    .catch(function (error) {
-      console.log(config.address);
+    .catch((error) => {
       console.log(error);
     })
   }
+  // displayResults = () => {
+  //   let layout = []
+  //   for(let i=0; i<len(this.state.results);i++){
+  //     layout.push(<ResultCard content={this.state.results[i]}>);
+  //   }
+  // }
   render() {
+    console.log("rendere");
     return (
-      <div>
+      <div className="results">
+      {
+        this.state.results.map((data, i) => {
+          return(
+            <ResultCard data={data}/>
+          );
+        })
+      }
       </div>
     );
   }
