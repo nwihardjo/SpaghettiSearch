@@ -19,7 +19,7 @@ type Term struct {
 	Pos     map[string][]float32
 }
 
-func Parse(doc []byte, baseURL string) (titleInfo Term, bodyInfo Term, cleanFancy map[string][]string) {
+func Parse(doc []byte, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
 	title, words, meta, fancy, fancyURLs := tokenize(doc, baseURL)
 	// Clean terms in title and body
 	cleanTitle := Laundry(title)
@@ -38,6 +38,11 @@ func Parse(doc []byte, baseURL string) (titleInfo Term, bodyInfo Term, cleanFanc
 	freqBody, posBody := getWordInfo(cleanBody, nil)
 	titleInfo = Term{Content: title, Freq: freqTitle, Pos: posTitle}
 	bodyInfo = Term{Freq: freqBody, Pos: posBody}
+	fancyInfo = make(map[string]Term)
+	for k, v := range cleanFancy {
+		freqFancy, posFancy := getWordInfo(v, nil)
+		fancyInfo[k] = Term{Freq: freqFancy, Pos: posFancy}
+	}
 	return
 }
 
