@@ -2,9 +2,11 @@ package parser
 
 import (
 	"bytes"
-  "io/ioutil"
+	"crypto/md5"
+	"encoding/hex"
 	"github.com/surgebase/porter2"
 	"golang.org/x/net/html"
+	"io/ioutil"
 	"regexp"
 	"strings"
 )
@@ -13,53 +15,123 @@ var stopWords = make(map[string]bool)
 
 type Term struct {
 	Content string
-  Freq map[string]uint32
-  Pos map[string][]float32
+	Freq    map[string]uint32
+	Pos     map[string][]float32
 }
 
-func Parse(doc []byte) (titleInfo Term, bodyInfo Term) {
-  title, words := tokenize(doc)
-  // Clean terms in title and body
-  cleanTitle := Laundry(title)
-  cleanBody := Laundry(strings.Join(words, " "))
+func Parse(doc []byte, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
+	title, words, meta, fancy, fancyURLs := tokenize(doc, baseURL)
+	// Clean terms in title and body
+	cleanTitle := Laundry(title)
+	cleanBody := Laundry(strings.Join(words, " "))
+	cleanMeta := Laundry(strings.Join(meta, " "))
+	cleanFancy = make(map[string][]string)
+	for i, f := range fancy {
+		urlHash := md5.Sum([]byte(fancyURLs[i]))
+		urlHashString := hex.EncodeToString(urlHash[:])
+		cleanFancy[urlHashString] = append(cleanFancy[fancyURLs[i]], Laundry(f)...)
+	}
 
-  // Get frequency and positions of each term
-  // in title and body
-	freqTitle, posTitle := getWordInfo(cleanTitle)
-	freqBody, posBody := getWordInfo(cleanBody)
+	// Get frequency and positions of each term
+	// in title and body
+	freqTitle, posTitle := getWordInfo(cleanTitle, cleanMeta)
+	freqBody, posBody := getWordInfo(cleanBody, nil)
 	titleInfo = Term{Content: title, Freq: freqTitle, Pos: posTitle}
 	bodyInfo = Term{Freq: freqBody, Pos: posBody}
-  return
+	fancyInfo = make(map[string]Term)
+	for k, v := range cleanFancy {
+		freqFancy, posFancy := getWordInfo(v, nil)
+		fancyInfo[k] = Term{Freq: freqFancy, Pos: posFancy}
+	}
+	return
 }
 
-func tokenize(doc []byte) (title string, words []string) {
-  var prevToken string
-  //Tokenize document
-  tokenizer := html.NewTokenizer(bytes.NewReader(doc))
-  for {
-    tokenType := tokenizer.Next()
-    // end of file or html error
-    if tokenType == html.ErrorToken {
-      break
-    }
-    token := tokenizer.Token()
-    switch tokenType {
-    case html.StartTagToken:
-      if token.Data == "title" {
-        tokenizer.Next()
-        title = strings.TrimSpace(tokenizer.Token().Data)
-      }
-      prevToken = token.Data
-      break
-    case html.TextToken:
-      cleaned := strings.TrimSpace(token.Data)
-      if prevToken != "script" && prevToken != "a" && prevToken != "style" && cleaned != "" {
-        words = append(words, cleaned)
-      }
-      break
-    }
-  }
-  return
+func tokenize(doc []byte, baseURL string) (title string,
+	words, meta, fancy, fancyURLs []string) {
+
+	doc_, err := html.Parse(bytes.NewReader(doc))
+	if err != nil {
+		panic(err)
+	}
+	var f func(*html.Node, string)
+	f = func(n *html.Node, baseURL string) {
+		if n.Type == html.ElementNode {
+			if n.Data == "title" {
+				if n.FirstChild != nil {
+					title = strings.TrimSpace(n.FirstChild.Data)
+				}
+			} else if n.Data == "meta" {
+				var name string
+				var content string
+				for _, attr := range n.Attr {
+					if attr.Key == "name" {
+						name = attr.Val
+					}
+					if attr.Key == "content" {
+						content = attr.Val
+					}
+				}
+				if name == "description" || name == "keywords" || name == "author" {
+					meta = append(meta, content)
+				}
+			}
+		} else if n.Type == html.TextNode {
+			tempD := n.Parent.Data
+			cleaned := strings.TrimSpace(n.Data)
+			if tempD != "title" && tempD != "script" && tempD != "style" && cleaned != "" {
+				if tempD == "a" {
+					for _, attr := range n.Parent.Attr {
+						if attr.Key == "href" {
+							urlRe := regexp.MustCompile("[^A-Za-z0-9-._~:/?#[]@!$&'()\\*\\+,;=]|\r?\n| ")
+							/* Skip if no href or
+							if href is anchor or
+							if href is mail or script */
+							if attr.Val == "" ||
+								attr.Val[0] == '#' ||
+								strings.HasPrefix(attr.Val, "javascript") ||
+								strings.HasPrefix(attr.Val, "mailto") {
+								break
+							}
+
+							thisURL := ""
+							/* Make sure the URL ends without '/' */
+							if strings.HasSuffix(attr.Val, "/") {
+								thisURL = attr.Val[:len(attr.Val)-1]
+							} else {
+								thisURL = attr.Val
+							}
+							if len(thisURL) == 0 {
+								break
+							}
+
+							var tail string
+							if len(thisURL) < 4 ||
+								(thisURL[:4] != "http" && thisURL[:4] != "www.") {
+								if thisURL[0] != '/' {
+									tail = urlRe.ReplaceAllString(baseURL+"/"+thisURL, "")
+								} else {
+									tail = urlRe.ReplaceAllString(baseURL+thisURL, "")
+								}
+							} else {
+								tail = urlRe.ReplaceAllString(thisURL, "")
+							}
+							fancyURLs = append(fancyURLs, tail)
+							fancy = append(fancy, cleaned)
+							// fmt.Println(tail, cleaned)
+						}
+						break
+					}
+				}
+				words = append(words, cleaned)
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c, baseURL)
+		}
+	}
+	f(doc_, baseURL)
+
+	return
 }
 
 func isStopWord(s string) (isStop bool) {
@@ -97,11 +169,15 @@ func Laundry(s string) (c []string) {
 	return
 }
 
-func getWordInfo(words []string) (termFreq map[string]uint32, termPos map[string][]float32) {
+func getWordInfo(words []string, meta []string) (termFreq map[string]uint32, termPos map[string][]float32) {
 	termFreq = make(map[string]uint32)
 	termPos = make(map[string][]float32)
 	for pos, word := range words {
 		termPos[word] = append(termPos[word], float32(pos))
+		termFreq[word] = termFreq[word] + 1
+	}
+	for _, word := range meta {
+		termPos[word] = append(termPos[word], float32(-1))
 		termFreq[word] = termFreq[word] + 1
 	}
 	return

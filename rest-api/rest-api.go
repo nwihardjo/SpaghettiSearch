@@ -250,7 +250,6 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 
 	params := mux.Vars(r)
 	query := params["terms"]
-	// TODO: whether below is necessary
 	// if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
 	// 	panic(err)
 	// }

@@ -3,9 +3,9 @@ package database
 import (
 	"encoding/json"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 /*
@@ -34,26 +34,27 @@ import (
 
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	Url           url.URL           `json:"Url"`
-	Page_title    []string          `json:"Page_title"`
-	Mod_date      time.Time         `json:"Mod_date"`
-	Page_size     uint32            `json:"Page_size"`
-	Children      []string          `json:"Children"`
-	Parents       []string          `json:"Parents"`
-	Words_mapping map[string]uint32 `json:"Words_mapping"`
+	Url        url.URL   `json:"Url"`
+	Page_title []string  `json:"Page_title"`
+	Mod_date   time.Time `json:"Mod_date"`
+	Page_size  uint32    `json:"Page_size"`
+	Children   []string  `json:"Children"`
+	// mapping from parent Hash to anchor texts
+	Parents map[string][]string `json:"Parents"`
 	//mapping for wordHash to wordFrequency
+	Words_mapping map[string]uint32 `json:"Words_mapping"`
 }
 
 // override json.Marshal to support marshalling of DocInfo type
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
-		Url           string            `json:"Url"`
-		Page_title    []string          `json:"Page_title"`
-		Mod_date      string            `json:"Mod_date"`
-		Page_size     uint32            `json:"Page_size"`
-		Children      []string          `json:"Children"`
-		Parents       []string          `json:"Parents"`
-		Words_mapping map[string]uint32 `json:"Words_mapping"`
+		Url           string              `json:"Url"`
+		Page_title    []string            `json:"Page_title"`
+		Mod_date      string              `json:"Mod_date"`
+		Page_size     uint32              `json:"Page_size"`
+		Children      []string            `json:"Children"`
+		Parents       map[string][]string `json:"Parents"`
+		Words_mapping map[string]uint32   `json:"Words_mapping"`
 	}{u.Url.String(), u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size,
 		u.Children, u.Parents, u.Words_mapping}
 
@@ -97,9 +98,15 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 				u.Children[k_] = v_.(string)
 			}
 		case "parents":
-			u.Parents = make([]string, len(v.([]interface{})))
-			for k_, v_ := range v.([]interface{}) {
-				u.Parents[k_] = v_.(string)
+			u.Parents = make(map[string][]string)
+			for k_, v_ := range v.(map[string]interface{}) {
+				if v_ != nil {
+					for _, v2 := range v_.([]interface{}) {
+						u.Parents[k_] = append(u.Parents[k_], v2.(string))
+					}
+				} else {
+					u.Parents[k_] = []string{}
+				}
 			}
 		case "words_mapping":
 			u.Words_mapping = make(map[string]uint32)
