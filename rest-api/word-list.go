@@ -1,4 +1,4 @@
-package mai1n
+package main
 
 import (
 	db "the-SearchEngine/database"
@@ -54,7 +54,7 @@ func GetWordList(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func m1ain() {
+func main() {
 	ctx, cancel := context.WithCancel(context.TODO())
 	log, _ := logger.New("test", 1)
 	inv, frw, _ = db.DB_init(ctx, log)
