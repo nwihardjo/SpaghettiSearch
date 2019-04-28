@@ -33,7 +33,10 @@ class Main extends Component {
           <div><h1>Hello,</h1>
           <Form onSubmit={this.handleSearch}>
             <Input type="search" className="searchbox--main" placeholder="What would you like to search?"  bsSize="lg" onChange={this.handleChange} />
-          </Form></div>
+          </Form><br/>
+          <small className="text-muted">
+            OR TRY <a href='/word-list'>SEARCHING BY WORDS</a>
+          </small></div>
         </div>
       );
     }
