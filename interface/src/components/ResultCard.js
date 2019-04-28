@@ -11,7 +11,7 @@ class ResultCard extends Component {
   }
   componentDidMount (props) {
     console.log("hi",this.props.data)
-    this.setState({Url: this.props.data['Url'],
+    this.setState({Url: this.props.data['Url']['Host'],
                   Page_title: this.props.data['Page_title'],
                   Page_size: this.props.data['Page_size'],
                   Children: this.props.data['Children'],
@@ -27,8 +27,8 @@ class ResultCard extends Component {
         </CardBody>
         <CardBody>
           <CardText>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque dictum nulla vitae elit tempus varius. Duis vitae tellus dapibus, convallis tortor sit amet, hendrerit magna. 
-          <small className="text-muted">            {this.state.Page_size}
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque dictum nulla vitae elit tempus varius. Duis vitae tellus dapibus, convallis tortor sit amet, hendrerit magna.
+          <small className="text-muted">  {this.state.Page_size}
 </small>
           </CardText>
         </CardBody>

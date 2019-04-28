@@ -18,23 +18,34 @@ class Results extends Component {
   //   this._getResults(query);
   // }
   getResults = (query) => {
-    axios.get(config.address+'query/google')
+    console.log(query)
+    axios({
+      method: 'post',
+      url: config.address+'/query',
+      data: {
+        Query: query
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
     .then((response) => {
-      console.log(query, response.data);
+      console.log(response.data);
       this.setState({query: query, results: response.data});
     })
     .catch((error) => {
       console.log(error);
-    })
+    });
+    // axios.get(config.address+'query/google')
+    // .then((response) => {
+    //   console.log(query, response.data);
+    //   this.setState({query: query, results: response.data});
+    // })
+    // .catch((error) => {
+    //   console.log(error);
+    // })
   }
-  // displayResults = () => {
-  //   let layout = []
-  //   for(let i=0; i<len(this.state.results);i++){
-  //     layout.push(<ResultCard content={this.state.results[i]}>);
-  //   }
-  // }
   render() {
-    console.log("rendere");
     return (
       <div className="results">
       {
