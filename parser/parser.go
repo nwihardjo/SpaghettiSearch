@@ -177,7 +177,7 @@ func getWordInfo(words []string, meta []string) (termFreq map[string]uint32, ter
 		termFreq[word] = termFreq[word] + 1
 	}
 	for _, word := range meta {
-		termPos[word] = append(termPos[word], float32(-1))
+		termPos[word] = append(termPos[word], float32(-100))
 		termFreq[word] = termFreq[word] + 1
 	}
 	return
