@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"the-SearchEngine/parser"
 	"math"
+	"regexp"
 	db "the-SearchEngine/database"
 	"sort"
 	"sync"
@@ -57,6 +58,8 @@ func genAggrDocsPipeline(docRank map[string]Rank_term) <- chan Rank_result {
 type Rank_term struct {
 	TitleWeights	[]float32
 	BodyWeights	[]float32
+	// used only for phrase search
+	TermPos		uint8
 }
 
 type Rank_result struct {
@@ -66,15 +69,15 @@ type Rank_result struct {
 }
 
 type Rank_combined struct {
-	Url           url.URL           `json:"Url"`
-	Page_title    []string          `json:"Page_title"`
-	Mod_date      time.Time         `json:"Mod_date"`
-	Page_size     uint32            `json:"Page_size"`
-	Children      []string          `json:"Children"`
-	Parents       []string          `json:"Parents"`
-	Words_mapping map[string]uint32 `json:"Words_mapping"`
-	PageRank      float64		`json:"PageRank"`
-	FinalRank     float64		`json:"FinalRank"`
+	Url           url.URL        		   `json:"Url"`
+	Page_title    []string       		   `json:"Page_title"`
+	Mod_date      time.Time      		   `json:"Mod_date"`
+	Page_size     uint32         		   `json:"Page_size"`
+	Children      []string       		   `json:"Children"`
+	Parents       map[string][]string	   `json:"Parents"`
+	Words_mapping map[string]uint32 	   `json:"Words_mapping"`
+	PageRank      float64			   `json:"PageRank"`
+	FinalRank     float64			   `json:"FinalRank"`
 }
 
 func appendSort(data []Rank_combined, el Rank_combined) []Rank_combined {
@@ -92,7 +95,6 @@ func getFromInverted(ctx context.Context, termChan <-chan string, inv []db.DB) <
 			// get list of documents from both inverted tables
 			var titleResult, bodyResult map[string][]float32
 			if v, err := inv[0].Get(ctx, term); err != nil && err != badger.ErrKeyNotFound {
-			
 				panic(err)
 			} else if v != nil {
 				titleResult = v.(map[string][]float32)
@@ -243,10 +245,203 @@ func getDocInfo(ctx context.Context, docHash string, forw *db.DB) <-chan db.DocI
 	return out
 }
 
+
+var re = regexp.MustCompile(`".*?"`)
+
+func getPhrase(s string) []string {
+	ms := re.FindAllString(s, -1)
+	ss := make([]string, len(ms))
+	for i, m := range ms {
+		ss[i] = m[1 : len(m)-1]
+	}
+	return ss
+}
+
+type termPhrase struct {
+	Term	string
+	Pos	uint8
+}
+
+func genPhrasePipeline(listStr []string) <- chan termPhrase {
+	out := make(chan termPhrase, len(listStr))
+	for i := 0; i < len(listStr); i++ {
+		out <- termPhrase{Term: listStr[i], Pos: uint8(i),}
+	}
+	close(out)
+	return out
+}
+
+func getPosTerm(ctx context.Context, termChan <-chan termPhrase, inv []db.DB) <-chan map[string]Rank_term {
+	out := make(chan map[string]Rank_term)
+	go func() {
+		for term := range termChan {
+			// get list of documents from both inverted tables
+			var titleResult, bodyResult map[string][]float32
+			if v, err := inv[0].Get(ctx, term.Term); err != nil && err != badger.ErrKeyNotFound {
+				panic(err)
+			} else if v != nil {
+				titleResult = v.(map[string][]float32)
+			}
+
+			if v, err := inv[1].Get(ctx, term.Term); err != nil && err != badger.ErrKeyNotFound {
+				panic(err)
+			} else if v!= nil {
+				bodyResult = v.(map[string][]float32)
+			}
+
+			// merge document retrieved from inverted tables
+			ret := make(map[string]Rank_term)
+			for docHash, listPos := range bodyResult {
+				// first entry is norm_tf*idf, no need to be subtracted
+				for i := 1; i < len(listPos); i++ {
+					listPos[i] -= float32(term.Pos)
+				}
+				ret[docHash] = Rank_term{
+					TitleWeights: nil,
+					BodyWeights : listPos,
+					TermPos    : term.Pos,
+				}
+			}
+			
+			for docHash, listPos := range titleResult {
+				// first entry is norm_tf*idf, no need to be subtracted
+				for i := 1; i < len(listPos); i++ {
+					listPos[i] -= float32(term.Pos)
+				}
+				tempVal := ret[docHash]
+				tempVal.TitleWeights = listPos
+				tempVal.TermPos = term.Pos
+				ret[docHash] = tempVal
+			}
+			
+			out <- ret
+		}
+		close(out)
+	}()
+	return out
+}
+
+func sortFloat32(slice []float32) []float32 {
+	sliceFloat64 := make([]float64, len(slice))
+	for i := 0; i < len(slice); i++ {
+		sliceFloat64[i] = float64(slice[i])
+	}
+
+	sort.Float64s(sliceFloat64)
+	for i := 0; i < len(slice); i++ {
+		slice[i] = float32(sliceFloat64[i])
+	}
+	return slice
+}
+
+func intersect(slice1, slice2 []float32) []float32 {
+	var ret []float32
+
+	// sort slice first based on sort library
+	slice1 = sortFloat32(slice1)
+	slice2 = sortFloat32(slice2)
+	
+	i, j := 0, 0
+	for i != len(slice1) && j != len(slice2) {
+		if slice1[i] == slice2[j] {
+			ret = append(ret, slice1[i])
+			i += 1
+			j += 1
+		} else if slice1[i] > slice2[j] {
+			j += 1
+		} else {
+			i += 1
+		}
+	}
+	return ret
+}
+
+func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []db.DB) <-chan map[string]Rank_term {
+	out := make(chan map[string]Rank_term, 1)
+	
+	go func() {
+		// generate common channel with inputs
+		phraseInChan := genPhrasePipeline(phraseTokenised)
+
+		// fan-out to get term occurence from inverted tables
+		numFanOut := len(phraseTokenised)
+		termOutChan := [] (<-chan map[string]Rank_term){}
+		for i := 0; i < numFanOut; i ++ {
+			termOutChan = append(termOutChan, getPosTerm(ctx, phraseInChan, inv))
+		}
+
+		// fan-in the docs, and group the weights based on the phrase's term position
+		aggregatedResult := make(map[string](map[uint8]Rank_term))
+		for docsMatched := range fanInDocs(termOutChan) {
+			for docHash, ranks := range docsMatched {
+				val_ := aggregatedResult[docHash]
+				if val_ == nil {
+					val_ = make(map[uint8]Rank_term)
+				}
+
+				val := val_[ranks.TermPos]
+				val.TitleWeights = append(val.TitleWeights, ranks.TitleWeights...)
+				val.BodyWeights = append(val.BodyWeights, ranks.BodyWeights...)
+				val_[ranks.TermPos] = val
+				aggregatedResult[docHash] = val_
+			}
+		}	
+		
+		ret := make(map[string]Rank_term)		
+
+		// evaluate and return only documents containing the phrase
+		for docHash, termWeights := range aggregatedResult {
+			deleteBody, deleteTitle := false, false
+			var sumBodyWeight, sumTitleWeight float32
+
+			// numFanOut equals to the number of word in the phrase
+			if len(termWeights) != numFanOut {
+				deleteBody, deleteTitle = true, true
+			} else {
+				// TODO: assume the len(phase) >= 1
+				sumBodyWeight, sumTitleWeight = termWeights[0].BodyWeights[0], termWeights[0].TitleWeights[0]
+				bodyIntersect := termWeights[0].BodyWeights[1:]
+				titleIntersect := termWeights[0].TitleWeights[1:]
+
+				for idx := 1; idx < len(termWeights); idx++ {
+					i := uint8(idx)
+					sumBodyWeight += termWeights[i].BodyWeights[0]
+					bodyIntersect = intersect(bodyIntersect, termWeights[i].BodyWeights[1:])
+
+					sumTitleWeight += termWeights[i].TitleWeights[0]
+					titleIntersect = intersect(titleIntersect, termWeights[i].TitleWeights[1:])
+				}
+				deleteBody, deleteTitle = len(bodyIntersect)==0, len(titleIntersect)==0
+			}
+
+			// append doc having phrase to final result
+			if !deleteBody && !deleteTitle {
+				val := ret[docHash]
+				if !deleteBody {
+					val.BodyWeights = append(val.BodyWeights, sumBodyWeight)
+				}
+				if !deleteTitle {
+					val.TitleWeights = append(val.TitleWeights, sumTitleWeight)
+				}
+				ret[docHash] = val
+			}
+		}
+
+		out <- ret
+	}()
+
+	return out
+}
+
+			
+
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+
+
+	//---------------- QUERY PARSING ----------------//
 
 	params := mux.Vars(r)
 	query := params["terms"]
@@ -256,13 +451,34 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 
 	query = strings.Replace(query, "-", " ", -1)	
 	log.Print("Querying terms:", query)
-	queryTokenised := parser.Laundry(query)
+	timer := time.Now()
+	// separate the phrase into variable phrases, and exclude them from the query
+	phrases := getPhrase(query)
+	for _, term := range phrases {
+		query = strings.Replace(query, "\""+string(term)+"\"", "", 1)
+	}
+	queryTokenised := parser.Laundry(strings.Join(strings.Fields(query), " "))
+	phraseTokenised := parser.Laundry(strings.Join(phrases, " "))
 
-	// convert to wordHash
+	// convert term to docHash
+	for i := 0; i < len(phrases); i++ {
+		tempHash := md5.Sum([]byte(phraseTokenised[i]))
+		phraseTokenised[i] = hex.EncodeToString(tempHash[:])
+	}
 	for i := 0; i < len(queryTokenised); i++ {
 		tempHash := md5.Sum([]byte(queryTokenised[i]))
 		queryTokenised[i] = hex.EncodeToString(tempHash[:])
 	}
+
+
+	//---------------- PHRASE RETRIEVAL ----------------//
+	
+	// use future pattern
+	// TODO: double-check what laundry will return if "" is passed
+	docPhrase := getPhraseFromInverted(ctx, phraseTokenised, inv)
+
+
+	//---------------- NON-PHRASE TERM RETRIEVAL ----------------//
 
 	// generate common channel with inputs
 	termInChan := genTermPipeline(queryTokenised)
@@ -286,6 +502,16 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		}
 	}	
 
+	
+	//---------------- COMBINED RETRIEVAL, FINAL RANK CALCULATION ----------------//
+	
+	for docHash, ranks := range <- docPhrase {
+		val := aggregatedDocs[docHash]
+		val.TitleWeights = append(val.TitleWeights, ranks.TitleWeights...)
+		val.BodyWeights = append(val.BodyWeights, ranks.BodyWeights...)
+		aggregatedDocs[docHash] = val
+	}
+
 	// common channel for inputs of final ranking calculation
 	docsInChan := genAggrDocsPipeline(aggregatedDocs)
 
@@ -308,6 +534,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	} else {
 		json.NewEncoder(w).Encode(finalResult)
 	}
+	log.Print("Query processed in ", time.Since(timer))
 }
 
 func main() {
@@ -329,7 +556,7 @@ func main() {
 	
 	// start server
 	router := mux.NewRouter()
-	log.Print("Server is on")
+	log.Print("Server is running")
 	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
 	router.HandleFunc("/wordlist/{pre}", GetWordList).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8080", router))

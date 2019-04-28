@@ -62,14 +62,9 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 			}
 		} else {
 			// base case: everything is uniform
-			if iteration == 1 {
-				for _, docHash := range setWebNodes {
-					lastRank[docHash] = 1.0 / float64(n)
-				}
-			}
-
 			for _, docHash := range setWebNodes {
 				currentRank[docHash] = 1.0 / float64(n)
+				lastRank[docHash] = 1.0 / float64(n)
 			}
 		}
 

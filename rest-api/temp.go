@@ -21,12 +21,16 @@ type docResult struct {
 	FinalRank     float64		`json:"FinalRank"`
 }
 
+type request struct {
+	query	string	`json:"query"`
+}
+
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 
-	var query string
+	var query request
 	_ = json.NewDecoder(r.Body).Decode(&query)
 	log.Print("DEBUG: Querying ", query, " ...")
 	log.Print("DEBUG: ", r.Body)
