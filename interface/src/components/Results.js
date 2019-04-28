@@ -14,14 +14,11 @@ class Results extends Component {
     this.setState({query: this.props.query});
     this.getResults(this.props.query);
   }
-  // getResults = (query) => {
-  //   this._getResults(query);
-  // }
   getResults = (query) => {
-    console.log(query)
+    console.log("Results received query: ", query)
     axios({
       method: 'post',
-      url: config.address+'/query',
+      url: config.address+'query',
       data: {
         Query: query
       },
@@ -36,14 +33,6 @@ class Results extends Component {
     .catch((error) => {
       console.log(error);
     });
-    // axios.get(config.address+'query/google')
-    // .then((response) => {
-    //   console.log(query, response.data);
-    //   this.setState({query: query, results: response.data});
-    // })
-    // .catch((error) => {
-    //   console.log(error);
-    // })
   }
   render() {
     return (

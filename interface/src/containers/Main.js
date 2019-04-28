@@ -16,9 +16,11 @@ class Main extends Component {
     this.setState({showResults:true});
   }
   handleChange = (ev) => {
+    ev.preventDefault();
     this.setState({
       query: ev.target.value
     });
+    console.log(this.state.query)
   }
   render() {
     if(this.state.showResults) {

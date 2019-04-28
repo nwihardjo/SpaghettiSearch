@@ -4,10 +4,10 @@ import {Nav, Navbar, NavbarBrand, NavLink, NavItem, Form, Input} from 'reactstra
 import '../styles/ResultsContainer.css';
 
 class ResultsContainer extends Component {
-  constructor () {
-    super()
+  constructor (props) {
+    super(props)
     this.resultsElement = React.createRef();
-    this.state = {query: "", results: []}
+    this.state = {query: props.query, results: []}
   }
   componentDidMount (props) {
     this.setState({query: this.props.query});
@@ -20,28 +20,19 @@ class ResultsContainer extends Component {
   getResults = (ev) => {
     ev.preventDefault();
     this.resultsElement.current.getResults(this.state.query);
-    // axios.get(config.address+'query/google', { crossdomain: true })
-    // .then(function (response) {
-    //   console.log(response.data);
-    //   this.setState({results: response.data});
-    // })
-    // .catch(function (error) {
-    //   console.log(config.address);
-    //   console.log(error);
-    // })
   }
   render() {
     return (
       <div>
       <Navbar color="faded" light className="header">
-      <NavbarBrand><b>Query</b></NavbarBrand>
+      <NavbarBrand><b>Spaghetti</b></NavbarBrand>
       <Nav className="mr-auto" navbar>
       <Form onSubmit={this.getResults}>
         <Input id='searchbar' type="search" className="searchbox--results" placeholder="What would you like to search?" defaultValue={this.state.query} onChange={this.handleChange}/>
       </Form>
       </Nav>
       </Navbar>
-      <Results ref={this.resultsElement}/>
+      <Results ref={this.resultsElement} query={this.state.query}/>
       </div>
     );
   }
