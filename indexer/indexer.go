@@ -231,7 +231,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 				babi := make(map[string][]float32)
 				for _, w := range cleanFancy[kid] {
 					tttt[w] += 1
-					babi[w] = append(babi[w], -1)
+					babi[w] = append(babi[w], -100)
 				}
 				maxFreq := getMaxFreq(fancyInfo[kid].Freq)
 				for _, w := range cleanFancy[kid] {
@@ -276,7 +276,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 				babi := make(map[string][]float32)
 				for _, w := range cleanFancy[kid] {
 					tttt[w] += 1
-					babi[w] = append(babi[w], -1)
+					babi[w] = append(babi[w], -100)
 				}
 				for i, w := range docInfoC_.Page_title {
 					tttt[w] += 1
