@@ -3,13 +3,14 @@ package database
 import (
 	"encoding/json"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 /*
 =============================== SCHEMA DEFINITION ==========================================
+
 	Schema for inverted table for both body and title page schema:
 		key	: wordHash (type: string)
 		value	: map of docHash to list of positions (type: map[string][]uint32)
@@ -25,43 +26,35 @@ import (
 	Schema for forward table forw[3]:
 		key	: docHash (type: string)
 		value	: pageRank value (type: float64)
-========================= MARSHAL AND UNMARSHALING =======================================
-	Unless specified, all defined struct can be casted into array of bytes as below. Then the data can be passed for Set or any operation on the table object.
-		byteArray, err := json.Marshal(any_struct_defined_in_this_file)
-	To cast back into the desired data type, use Unmarshal operation
-		byteArray, err := tableObject.Get(some_context, key_in_byteArray)
-		var a desired_datatype
-		err = json.Unmarshal(byteArray, &a)
-	For url.URL data type, use command below to both encode it into array of byte and vice versa
-		urlObject, err := url.Parse(url_in_string)
-		byteArray, err := urlObject.MarshalBinary()
-		tempUrl := &url.URL{}
-		err := tempUrl.UnmarshalBinary(byteArray)
+	Schema for forward table forw[4]:
+		key	: docHash (type: string)
+		value	: page magnitude (type: map[string]float64)
+
 */
 
-// NOTE: Renamed after URL_value in the previous version
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
 type DocInfo struct {
-	Url           url.URL           `json:"Url"`
-	Page_title    []string          `json:"Page_title"`
-	Mod_date      time.Time         `json:"Mod_date"`
-	Page_size     uint32            `json:"Page_size"`
-	Children      []string          `json:"Children"`
-	Parents       []string          `json:"Parents"`
-	Words_mapping map[string]uint32 `json:"Words_mapping"`
+	Url        url.URL   `json:"Url"`
+	Page_title []string  `json:"Page_title"`
+	Mod_date   time.Time `json:"Mod_date"`
+	Page_size  uint32    `json:"Page_size"`
+	Children   []string  `json:"Children"`
+	// mapping from parent Hash to anchor texts
+	Parents map[string][]string `json:"Parents"`
 	//mapping for wordHash to wordFrequency
+	Words_mapping map[string]uint32 `json:"Words_mapping"`
 }
 
 // override json.Marshal to support marshalling of DocInfo type
 func (u DocInfo) MarshalJSON() ([]byte, error) {
 	basicDocInfo := struct {
-		Url           string            `json:"Url"`
-		Page_title    []string          `json:"Page_title"`
-		Mod_date      string            `json:"Mod_date"`
-		Page_size     uint32            `json:"Page_size"`
-		Children      []string          `json:"Children"`
-		Parents       []string          `json:"Parents"`
-		Words_mapping map[string]uint32 `json:"Words_mapping"`
+		Url           string              `json:"Url"`
+		Page_title    []string            `json:"Page_title"`
+		Mod_date      string              `json:"Mod_date"`
+		Page_size     uint32              `json:"Page_size"`
+		Children      []string            `json:"Children"`
+		Parents       map[string][]string `json:"Parents"`
+		Words_mapping map[string]uint32   `json:"Words_mapping"`
 	}{u.Url.String(), u.Page_title, u.Mod_date.Format(time.RFC1123), u.Page_size,
 		u.Children, u.Parents, u.Words_mapping}
 
@@ -105,9 +98,15 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 				u.Children[k_] = v_.(string)
 			}
 		case "parents":
-			u.Parents = make([]string, len(v.([]interface{})))
-			for k_, v_ := range v.([]interface{}) {
-				u.Parents[k_] = v_.(string)
+			u.Parents = make(map[string][]string)
+			for k_, v_ := range v.(map[string]interface{}) {
+				if v_ != nil {
+					for _, v2 := range v_.([]interface{}) {
+						u.Parents[k_] = append(u.Parents[k_], v2.(string))
+					}
+				} else {
+					u.Parents[k_] = []string{}
+				}
 			}
 		case "words_mapping":
 			u.Words_mapping = make(map[string]uint32)
@@ -174,6 +173,12 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val, err = json.Marshal(tempVal)
+		case "map[string]float64":
+			tempVal, ok := v.(map[string]float64)
+			if !ok {
+				return nil, nil, ErrValTypeNotMatch
+			}
+			val, err = json.Marshal(tempVal)
 		case "DocInfo":
 			tempVal, ok := v.(DocInfo)
 			if !ok {
@@ -205,6 +210,13 @@ func checkUnmarshal(v []byte, valType string) (val interface{}, err error) {
 		return strconv.ParseFloat(string(v), 64)
 	case "map[string][]float32":
 		tempVal := make(map[string][]float32)
+		err = json.Unmarshal(v, &tempVal)
+		if err != nil {
+			return nil, err
+		}
+		return tempVal, nil
+	case "map[string]float64":
+		tempVal := make(map[string]float64)
 		err = json.Unmarshal(v, &tempVal)
 		if err != nil {
 			return nil, err

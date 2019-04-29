@@ -7,9 +7,12 @@ import (
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
 	bpb "github.com/dgraph-io/badger/pb"
+	"github.com/eapache/channels"
 	"github.com/pkg/errors"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -62,6 +65,9 @@ type (
 
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
+
+		// db iterate for server
+		IterateInv(ctx context.Context, pre string, frw0 DB) ([]string, error)
 	}
 
 	BadgerDB struct {
@@ -71,7 +77,6 @@ type (
 		valType string
 	}
 )
-
 
 type (
 	BatchWriter interface {
@@ -125,6 +130,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 		[]string{"DocHash_docInfo/", strconv.Itoa(loadMode), "string", "DocInfo"},
 		[]string{"DocHash_children/", strconv.Itoa(loadMode), "string", "[]string"},
 		[]string{"DocHash_rank/", strconv.Itoa(loadMode), "string", "float64"},
+		[]string{"DocHash_magnitude/", strconv.Itoa(loadMode), "string", "map[string]float64"},
 	}
 
 	// create directory if not exist
@@ -409,4 +415,46 @@ func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
 		return nil
 	})
 	return err
+}
+
+func (bdb *BadgerDB) IterateInv(ctx context.Context, pre string, frw0 DB) ([]string, error) {
+	var retVal []string
+	arrChan := channels.NewInfiniteChannel()
+
+	err := bdb.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		var wg sync.WaitGroup
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			wg.Add(1)
+			go func(k string) {
+				defer wg.Done()
+				w_, e := frw0.Get(ctx, k)
+				if e != nil {
+					panic(e)
+				}
+				w := w_.(string)
+				if strings.HasPrefix(w, pre) {
+					arrChan.In() <- w
+				}
+			}(string(item.Key()))
+		}
+		wg.Wait()
+		for arrChan.Len() > 0 {
+			if x, ok := (<-arrChan.Out()).(string); ok {
+				retVal = append(retVal, x)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	} else {
+		return retVal, nil
+	}
 }
