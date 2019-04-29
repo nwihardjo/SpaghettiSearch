@@ -71,7 +71,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 	} else {
 		panic(err)
 	}
-	//mutex.Unlock()
+	// mutex.Unlock()
 
 	// title and body are structs
 	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(rootNode, urlString)
@@ -129,6 +129,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 		kidUrls = append(kidUrls, childURL)
 	}
 
+	// mutex.Lock()
 	// If the doc exists, check its title, body, children, and page size
 	// If any of them modified, update / delete accordingly
 	if checkIndex {
@@ -136,6 +137,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 			bwInv, bwFrw, wordMapping, pageSize, inverted, forward,
 			ctx, &updateTitle, &updateBody, &updateKids)
 	}
+	// mutex.Unlock()
 
 	// If the doc exists and there is no changes, return
 	if checkIndex && !updateTitle && !updateBody && !updateKids {
@@ -160,7 +162,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 
 	// START OF CRITICAL SECTION //
 	// LOCK //
-	//mutex.Lock()
+	// mutex.Lock()
 
 	//lock2.RLock()
 	// if current doc is not found or if the new title is different from the old one,
@@ -218,9 +220,6 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 				if cleanFancy[kid] == nil {
 					tempP[docHashString] = []string{}
 				} else {
-					// for _, w := range cleanFancy[kid] {
-					// 	tempP[docHashString] = tempW
-					// }
 					tempP[docHashString] = cleanFancy[kid]
 				}
 				docInfoC = database.DocInfo{*kidUrls[idx], nil, time.Time{}, 0, nil, tempP, nil}

@@ -40,6 +40,19 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 					thisURL = n.Attr[a].Val
 				}
 
+				/* Ignore media files */
+				isMedia := false
+				mediaExs := []string{".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi"}
+				for _, ex := range mediaExs {
+					if strings.HasSuffix(thisURL, ex) {
+						isMedia = true
+						break
+					}
+				}
+				if isMedia {
+					continue
+				}
+
 				/*
 					If the href does not start with 'http' or 'www',
 					append this to baseURL
@@ -100,7 +113,7 @@ func Crawl(sem *semaphore.Weighted, parentURL string,
 	if e != nil {
 		panic(e)
 	}
-	req.Header.Add("Accept", "text/html, application/xhtml+xml, application/xml;q=0.9, image/webp, */*;q=0.8")
+	req.Header.Add("Accept", "text/html, application/xhtml+xml, application/xml;q=0.9")
 	req.Header.Add("Accept-Language", "en")
 	resp, err := client.Do(req)
 	fmt.Println("Visited " + currentURL + " (elapsed time: " + time.Now().Sub(innerStart).String() + ")")

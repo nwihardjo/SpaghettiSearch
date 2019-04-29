@@ -99,6 +99,20 @@ func tokenize(doc *html.Node, baseURL string) (title string,
 							} else {
 								thisURL = attr.Val
 							}
+
+							/* Ignore media files */
+							isMedia := false
+							mediaExs := []string{".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi"}
+							for _, ex := range mediaExs {
+								if strings.HasSuffix(thisURL, ex) {
+									isMedia = true
+									break
+								}
+							}
+							if isMedia {
+								continue
+							}
+
 							if len(thisURL) == 0 {
 								break
 							}
@@ -116,7 +130,6 @@ func tokenize(doc *html.Node, baseURL string) (title string,
 							}
 							fancyURLs = append(fancyURLs, tail)
 							fancy = append(fancy, cleaned)
-							// fmt.Println(tail, cleaned)
 						}
 						break
 					}
