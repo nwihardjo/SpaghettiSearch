@@ -42,7 +42,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 
 		log.Print("DEBUG: Querying ", query.Query, " ...")
 
-		tempChild := []string{"children type","need","to","be","changed"}
+		tempChild := []string{"https://www.google.com","https://www.cse.ust.hk","to","be","changed"}
 		tempParents := []string{"parent type","need","to","be","changed"}
 		temp, _ := url.Parse("https://www.google.com")
 		temp_, _ := url.Parse("https://www.cse.ust.hk")
@@ -52,7 +52,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 
 		doc1 := docResult {
 			Url: *temp,
-			Page_title: []string{"this", "is", "google"},
+			Page_title: []string{"This ", "is", " google"},
 			Mod_date: time.Now(),
 			Page_size: uint32(10),
 			Children: tempChild,
@@ -63,7 +63,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		}
 		doc2 := docResult {
 			Url: *temp_,
-			Page_title: []string{"this", "is", "cse"},
+			Page_title: []string{"This ", "is ", "CSE"},
 			Mod_date: time.Now(),
 			Page_size: uint32(1000),
 			Children: tempChild,

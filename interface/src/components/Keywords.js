@@ -1,4 +1,7 @@
 import React, { Component } from 'react';
+import {Card, CardText} from 'reactstrap';
+
+import '../styles/Keywords.css';
 
 class Keywords extends Component {
   constructor (props) {
@@ -10,7 +13,9 @@ class Keywords extends Component {
   }
   render() {
     return (
-      <div>{this.state.word} {this.state.freq}</div>
+      <div className='word'>
+          {this.state.word} <span>&#8729;</span> {this.state.freq}
+      </div>
     );
   }
 }
