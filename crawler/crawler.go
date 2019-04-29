@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -53,14 +54,21 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				if len(thisURL) < 4 ||
 					(thisURL[:4] != "http" && thisURL[:4] != "www.") {
 
+					baseURLtype, e := url.Parse(baseURL)
+					if e != nil {
+						panic(e)
+					}
+					hn := baseURLtype.Hostname()
+					sc := baseURLtype.Scheme
+
 					if thisURL[0] != '/' {
 						head := urlRe.ReplaceAllString(baseURL, "")
-						tail := urlRe.ReplaceAllString(baseURL+"/"+thisURL, "")
+						tail := urlRe.ReplaceAllString(sc+"://"+hn+"/"+thisURL, "")
 						queue.In() <- []string{head, tail}
 						children[tail] = true
 					} else {
 						head := urlRe.ReplaceAllString(baseURL, "")
-						tail := urlRe.ReplaceAllString(baseURL+thisURL, "")
+						tail := urlRe.ReplaceAllString(sc+"://"+hn+thisURL, "")
 						queue.In() <- []string{head, tail}
 						children[tail] = true
 					}
@@ -135,7 +143,9 @@ func Crawl(sem *semaphore.Weighted, parentURL string,
 		childsArr = append(childsArr, k)
 	}
 
+	mutex.Lock()
 	indexer.Index(htmlData, currentURL, lock2, lm, ps, mutex, inv, forw, parentURL, childsArr)
+	mutex.Unlock()
 
 	resp.Body.Close()
 }
