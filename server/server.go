@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/mux"
 	"the-SearchEngine/parser"
 	"math"
-	"regexp"
 	db "the-SearchEngine/database"
 	"sort"
 	"sync"
@@ -17,7 +16,6 @@ import (
 	"github.com/dgraph-io/badger"
 	"crypto/md5"
 	"strings"
-	"net/url"
 	"time"
 )
 
@@ -28,15 +26,16 @@ var ctx context.Context
 
 func genTermPipeline(listStr []string) <- chan string {
 	out := make(chan string, len(listStr))
+	defer close(out)
 	for i := 0; i < len(listStr); i++ {
 		out <- listStr[i]
 	}
-	close(out)
 	return out
 }
 
 func genAggrDocsPipeline(docRank map[string]Rank_term) <- chan Rank_result {
 	out := make(chan Rank_result, len(docRank))
+	defer close(out)
 	for docHash, rank := range docRank {
 		ret := Rank_result{DocHash: docHash, TitleRank: 0.0, BodyRank: 0.0,}
 
@@ -50,42 +49,7 @@ func genAggrDocsPipeline(docRank map[string]Rank_term) <- chan Rank_result {
 
 		out <- ret
 	}
-	close(out)
 	return out
-}
-
-// several type for easier flow of channels
-type Rank_term struct {
-	TitleWeights	[]float32
-	BodyWeights	[]float32
-	// used only for phrase search
-	TermPos		uint8
-}
-
-type Rank_result struct {
-	DocHash		string
-	TitleRank	float64
-	BodyRank	float64
-}
-
-type Rank_combined struct {
-	Url           url.URL        		   `json:"Url"`
-	Page_title    []string       		   `json:"Page_title"`
-	Mod_date      time.Time      		   `json:"Mod_date"`
-	Page_size     uint32         		   `json:"Page_size"`
-	Children      []string       		   `json:"Children"`
-	Parents       map[string][]string	   `json:"Parents"`
-	Words_mapping map[string]uint32 	   `json:"Words_mapping"`
-	PageRank      float64			   `json:"PageRank"`
-	FinalRank     float64			   `json:"FinalRank"`
-}
-
-func appendSort(data []Rank_combined, el Rank_combined) []Rank_combined {
-	index := sort.Search(len(data), func(i int) bool { return data[i].FinalRank < el.FinalRank })
-	data = append(data, Rank_combined{})
-	copy(data[index+1:], data[index:])
-	data[index] = el
-	return data
 }
 
 func getFromInverted(ctx context.Context, termChan <-chan string, inv []db.DB) <-chan map[string]Rank_term {
@@ -183,7 +147,7 @@ func computeFinalRank(ctx context.Context, docs <- chan Rank_result, forw []db.D
 	go func() {
 		for doc := range docs {
 			// get doc metadata using future pattern for faster performance
-			metadata := getDocInfo(ctx, doc.DocHash, &forw[1])
+			metadata := getDocInfo(ctx, doc.DocHash, forw)
 
 			// get pagerank value
 			var PR float64
@@ -206,68 +170,205 @@ func computeFinalRank(ctx context.Context, docs <- chan Rank_result, forw []db.D
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
 			
-			// retrieve result from future
+			// retrieve result from future, assign ranking
 			docMetaData := <- metadata
-			out <- resultFormat(docMetaData, PR, 0.4*PR + 0.4*doc.TitleRank + 0.2*doc.BodyRank)
+			docMetaData.PageRank = PR
+			docMetaData.FinalRank = 0.4*PR + 0.4*doc.TitleRank + 0.2*doc.BodyRank
+
+			out <- docMetaData
 		}
 		close(out)
 	}()	
 	return out
 }		
-							
-func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combined {
-	return Rank_combined {
-		Url		:	metadata.Url,
-		Page_title	:	metadata.Page_title,
-		Mod_date	:	metadata.Mod_date,
-		Page_size	:	metadata.Page_size,
-		Children	:	metadata.Children,
-		Parents		:	metadata.Parents,
-		Words_mapping	:	metadata.Words_mapping,
-		PageRank	:	PR,
-		FinalRank	:	finalRank,
-	}
-}
 
-func getDocInfo(ctx context.Context, docHash string, forw *db.DB) <-chan db.DocInfo {
-	out := make(chan db.DocInfo, 1)
+func getDocInfo(ctx context.Context, docHash string, forw []db.DB) <-chan Rank_combined {
+	out := make(chan Rank_combined, 1)
 
 	go func() {
-		var ret db.DocInfo
-		if tempVal, err := (*forw).Get(ctx, docHash); err != nil {
+		var val db.DocInfo
+		if tempVal, err := forw[1].Get(ctx, docHash); err != nil {
 			panic(err)
 		} else {
-			ret = tempVal.(db.DocInfo)
+			val = tempVal.(db.DocInfo)
 		}
 
+		ret := resultFormat(val, 0, 0)
+		
+		parentChan := convertHashDocinfo(ctx, ret.Parents, forw)
+		childrenChan := convertHashDocinfo(ctx, ret.Children, forw)
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go convertHashWords(&wg, ctx, ret.Words_mapping, forw)
+
+		ret.Parents = <-parentChan
+		ret.Children = <-childrenChan
+
+		wg.Wait()
+		log.Print("DEBUG getting doc info finished")
 		out <- ret
 	}()
 	return out
 }
 
+func convertHashDocinfo(ctx context.Context, docHashes []string, forw []db.DB) <-chan []string{
+	out := make(chan []string, 1)
+	
+	go func() {
+		// generate common input
+		docHashInChan := genTermPipeline(docHashes)
+		
+		// fan-out to several getter
+		numFanOut := int(math.Ceil(float64(len(docHashes)) * 0.75))
+		docOutChan := [](<-chan string){}
+		for i := 0; i < numFanOut; i++ {
+			docOutChan = append(docOutChan, retrieveUrl(ctx, docHashInChan, forw))
+		}
 
-var re = regexp.MustCompile(`".*?"`)
+		// fan-in result
+		resultUrl := make([]string, len(docHashes))
+		for docUrl := range fanInUrl(docOutChan) {
+			resultUrl = append(resultUrl, docUrl)
+		}
 
-func getPhrase(s string) []string {
-	ms := re.FindAllString(s, -1)
-	ss := make([]string, len(ms))
-	for i, m := range ms {
-		ss[i] = m[1 : len(m)-1]
-	}
-	return ss
+		out <- resultUrl
+	}()
+	return out
 }
 
-type termPhrase struct {
-	Term	string
-	Pos	uint8
+func retrieveUrl(ctx context.Context, docHashIn <-chan string, forw []db.DB) <-chan string {
+	out := make(chan string, 1)
+	go func() {
+		for docHash := range docHashIn {
+			var url string
+			if val, err := forw[1].Get(ctx, docHash); err != nil {
+				panic(err)
+			} else {
+				doc := val.(db.DocInfo)
+				url = doc.Url.String()
+			}
+
+			out <- url
+		}
+		close(out)
+	}()
+	
+	return out
+}
+
+func fanInUrl(urlIn [] <-chan string) <-chan string {
+	var wg sync.WaitGroup
+	c := make(chan string)
+	out := func(urls <-chan string) {
+		defer wg.Done()
+		for url := range urls {
+			c <- url
+		}
+	}
+	
+	wg.Add(len(urlIn))
+	for _, url := range urlIn {
+		go out(url)
+	}
+	
+	// close once all output goroutines are done
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
+
+	return c
+}
+
+func genWordPipeline(wordMap map[string]uint32) <-chan string {
+	out := make(chan string, len(wordMap))
+	defer close(out)
+	for wordHash, _ := range wordMap {
+		out <- wordHash
+	}
+	return out
+}
+
+func fanInWords(wordIn [] <-chan map[string]string) <-chan map[string]string {
+	var wg sync.WaitGroup
+	c := make(chan map[string]string)
+	out := func(words <-chan map[string]string) {
+		defer wg.Done()
+		for mapping := range words {
+			for wordHash, wordStr := range mapping {
+				c <- map[string]string{wordHash: wordStr}
+			}
+		}
+	}
+
+	wg.Add(len(wordIn))
+	for _, word := range wordIn {
+		go out(word)
+	}
+
+	// close once all output goroutines are done
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
+	
+	return c
+}
+
+func retrieveWord(ctx context.Context, wordInChan <-chan string, forw []db.DB) <-chan map[string]string {
+	out := make(chan map[string]string, 1)
+	go func() {
+		for word := range wordInChan {
+			var wordStr string
+			if val, err := forw[0].Get(ctx, word); err != nil {
+				panic(err)
+			} else {
+				wordStr = val.(string)
+			}
+
+			out <- map[string]string{word: wordStr}
+		}
+		close(out)
+	}()
+	
+	return out
+}
+
+func convertHashWords(wg *sync.WaitGroup, ctx context.Context, wordMap map[string]uint32, forw []db.DB) {
+	defer wg.Done()
+	// generate common channel for word input
+	wordInChan := genWordPipeline(wordMap)
+
+	// fan-out to multiple workers to get the word in string
+	numFanOut := int(math.Ceil(float64(len(wordMap))))
+	wordOutChan := [] (<-chan map[string]string){}
+	for i := 0; i < numFanOut; i ++ {
+		wordOutChan = append(wordOutChan, retrieveWord(ctx, wordInChan, forw))
+	}
+
+	// fan-in word hash mapping
+	wordHashMap := make(map[string]string, len(wordMap))
+	for hashToWord := range fanInWords(wordOutChan) {
+		for wordHash, wordStr := range hashToWord {
+			wordHashMap[wordHash] = wordStr
+		}
+	}
+	
+	// assign the frequency to word in string
+	for wordHash, freq := range wordMap {
+		delete(wordMap, wordHash)
+		wordMap[wordHashMap[wordHash]] = freq
+	}
+	return
 }
 
 func genPhrasePipeline(listStr []string) <- chan termPhrase {
 	out := make(chan termPhrase, len(listStr))
+	defer close(out)
 	for i := 0; i < len(listStr); i++ {
 		out <- termPhrase{Term: listStr[i], Pos: uint8(i),}
 	}
-	close(out)
 	return out
 }
 
@@ -319,41 +420,6 @@ func getPosTerm(ctx context.Context, termChan <-chan termPhrase, inv []db.DB) <-
 		close(out)
 	}()
 	return out
-}
-
-func sortFloat32(slice []float32) []float32 {
-	sliceFloat64 := make([]float64, len(slice))
-	for i := 0; i < len(slice); i++ {
-		sliceFloat64[i] = float64(slice[i])
-	}
-
-	sort.Float64s(sliceFloat64)
-	for i := 0; i < len(slice); i++ {
-		slice[i] = float32(sliceFloat64[i])
-	}
-	return slice
-}
-
-func intersect(slice1, slice2 []float32) []float32 {
-	var ret []float32
-
-	// sort slice first based on sort library
-	slice1 = sortFloat32(slice1)
-	slice2 = sortFloat32(slice2)
-	
-	i, j := 0, 0
-	for i != len(slice1) && j != len(slice2) {
-		if slice1[i] == slice2[j] {
-			ret = append(ret, slice1[i])
-			i += 1
-			j += 1
-		} else if slice1[i] > slice2[j] {
-			j += 1
-		} else {
-			i += 1
-		}
-	}
-	return ret
 }
 
 func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []db.DB) <-chan map[string]Rank_term {
@@ -433,8 +499,6 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 	return out
 }
 
-			
-
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -484,7 +548,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	termInChan := genTermPipeline(queryTokenised)
 
 	// fan-out to get term occurence from inverted tables
-	numFanOut := int(math.Ceil(float64(len(queryTokenised)) * 0.75))
+	numFanOut := int(math.Ceil(float64(len(queryTokenised))* 0.75))
 	termOutChan := [] (<-chan map[string]Rank_term){}
 	for i := 0; i < numFanOut; i ++ {
 		termOutChan = append(termOutChan, getFromInverted(ctx, termInChan, inv))
