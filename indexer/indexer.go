@@ -38,18 +38,16 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	docHash := md5.Sum([]byte(urlString))
 	docHashString := hex.EncodeToString(docHash[:])
 
+	// mutex.Lock()
 	// Get Last Modified from DB
 	var dI database.DocInfo
 	dI_, err := forward[1].Get(ctx, docHashString)
-	checkIndex := true 
-	updateTitle := true
-	updateBody := true
-	updateKids := true
+	checkIndex := false
+	updateTitle := false
+	updateBody := false
+	updateKids := false
 	if err == nil {
-		dI, ok := dI_.(database.DocInfo)
-		if !ok {
-			panic("Type assertion failed")
-		}
+		dI = dI_.(database.DocInfo)
 		lm := dI.Mod_date
 		if lastModified.After(lm) {
 			// check dI different or not
@@ -72,9 +70,10 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	} else {
 		panic(err)
 	}
+	//mutex.Unlock()
 
 	// title and body are structs
-	titleInfo, bodyInfo := parser.Parse(doc)
+	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(doc, urlString)
 
 	// Parse title & page size
 	pageTitle := strings.Fields(titleInfo.Content)
@@ -95,6 +94,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		wordMapping[hex.EncodeToString(h[:])] = val
 	}
 
+	// Init batch writer for modified handler
 	var bwFrw []database.BatchWriter
 	var bwInv []database.BatchWriter
 
@@ -128,113 +128,15 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		kidUrls = append(kidUrls, childURL)
 	}
 
-
+	// If the doc exists, check its title, body, children, and page size
+	// If any of them modified, update / delete accordingly
 	if checkIndex {
-		if !reflect.DeepEqual(dI.Page_title, pageTitle) {
-			lock2.Lock()
-			for _, word := range dI.Page_title {
-				h := md5.Sum([]byte(word))
-				hStr := hex.EncodeToString(h[:])
-				docP_, e := inverted[0].Get(ctx, hStr)
-				if e != nil {
-					panic(e)
-				}
-				docP, ok := docP_.(map[string][]uint32)
-				if !ok {
-					panic("Type assertion failed")
-				}
-				if len(docP) > 1 {
-					// remove this doc from this row
-					delete(docP, docHashString)
-					if e = bwInv[0].BatchSet(ctx, hStr, docP); e != nil {
-						panic(e)
-					}
-				} else {
-					// delete this row
-					if e = inverted[0].Delete(ctx, hStr); e != nil {
-						panic(e)
-					}
-				}
-			}
-			lock2.Unlock()
-			updateTitle = true
-		}
-
-		if !reflect.DeepEqual(dI.Words_mapping, wordMapping) {
-			lock2.Lock()
-			for word, _ := range dI.Words_mapping {
-				h := md5.Sum([]byte(word))
-				hStr := hex.EncodeToString(h[:])
-				docP_, e := inverted[1].Get(ctx, hStr)
-				if e != nil {
-					panic(e)
-				}
-				docP, ok := docP_.(map[string][]uint32)
-				if !ok {
-					panic("Type assertion failed")
-				}
-				if len(docP) > 1 {
-					// remove this doc from this row
-					delete(docP, docHashString)
-					if e = bwInv[1].BatchSet(ctx, hStr, docP); e != nil {
-						panic(e)
-					}
-				} else {
-					// delete this row
-					if e = inverted[1].Delete(ctx, hStr); e != nil {
-						panic(e)
-					}
-				}
-			}
-			lock2.Unlock()
-			updateBody = true
-		}
-
-		if !reflect.DeepEqual(dI.Children, kids) {
-			for _, c := range dI.Children {
-				dIc_, e := forward[1].Get(ctx, c)
-				if e != nil {
-					panic(e)
-				}
-				dIc, ok := dIc_.(database.DocInfo)
-				if !ok {
-					panic("Type assertion failed")
-				}
-				tempParents := dIc.Parents[:]
-				dIc.Parents = make([]string, len(tempParents) - 1)
-				for _, t := range tempParents {
-					if t != docHashString {
-						dIc.Parents = append(dIc.Parents, t)
-					}
-				}
-				if e = bwFrw[1].BatchSet(ctx, c, dIc); e != nil {
-					panic(e)
-				}
-			}
-			updateKids = true
-		}
-
-		if dI.Page_size != uint32(pageSize) {
-			dI.Page_size = uint32(pageSize)
-			if !updateTitle && !updateBody && !updateKids {
-				if e := forward[1].Set(ctx, docHashString, dI); e != nil {
-					panic(e)
-				}
-			}
-		}
-
-		for _, f := range bwFrw {
-			if err = f.Flush(ctx); err != nil {
-				panic(err)
-			}
-		}
-		for _, i := range bwInv {
-			if err = i.Flush(ctx); err != nil {
-				panic(err)
-			}
-		}
+		checkAndUpdate(&dI, pageTitle, kids, lock2, docHashString,
+			bwInv, bwFrw, wordMapping, pageSize, inverted, forward,
+			ctx, &updateTitle, &updateBody, &updateKids)
 	}
 
+	// If the doc exists and there is no changes, return
 	if checkIndex && !updateTitle && !updateBody && !updateKids {
 		fmt.Println("\n\n[DEBUG] Checked, no update\n\n")
 		return
@@ -255,7 +157,12 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		batchWriter_inverted = append(batchWriter_inverted, temp)
 	}
 
-	lock2.RLock()
+	// START OF CRITICAL SECTION //
+	// LOCK //
+	//mutex.Lock()
+
+	//lock2.RLock()
+	// if current doc is not found or if the new title is different from the old one,
 	// process and load data to batch writer for inverted tables
 	// map word to wordHash as well if not exist
 	if !checkIndex || updateTitle {
@@ -273,7 +180,6 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 			setInverted(ctx, word, bodyInfo.Pos, maxFreq, docHashString, forward, inverted[1], batchWriter_forward, batchWriter_inverted[1], mutex)
 		}
 	}
-	lock2.RUnlock()
 
 	// write the key-value pairs set on batch write. If no value is to be flushed, it'll return nil
 	for _, f := range batchWriter_forward {
@@ -287,25 +193,135 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		}
 	}
 
+	// lock2.RUnlock()
+
+	// END OF CRITICAL SECTION //
+	// UNLOCK //
+	// mutex.Unlock()
+
 	// initialise batch writer for child append
 	bw_child := forward[1].BatchWrite_init(ctx)
+	bw_anchor := inverted[0].BatchWrite_init(ctx)
 	defer bw_child.Cancel(ctx)
+	defer bw_anchor.Cancel(ctx)
 
-	if !checkIndex || updateKids {
+	// mutex.Lock()
+	if !checkIndex || updateKids || updateBody {
 		for idx, kid := range kids {
+
 			// Get DocInfo corresponding to the child,
 			// make one if not present (for the sake of getting the url of not-yet-visited child)
 			docInfoC, err := forward[1].Get(ctx, kid)
 			if err == badger.ErrKeyNotFound {
-				docInfoC = database.DocInfo{*kidUrls[idx], nil, time.Time{}, 0, nil, []string{kid}, nil}
+				tempP := make(map[string][]string)
+				if cleanFancy[kid] == nil {
+					tempP[docHashString] = []string{}
+				} else {
+					// for _, w := range cleanFancy[kid] {
+					// 	tempP[docHashString] = tempW
+					// }
+					tempP[docHashString] = cleanFancy[kid]
+				}
+				docInfoC = database.DocInfo{*kidUrls[idx], nil, time.Time{}, 0, nil, tempP, nil}
 
 				// Set docHash of child -> docInfo of child using batch writer
 				if err = bw_child.BatchSet(ctx, kid, docInfoC); err != nil {
 					panic(err)
 				}
+
+				tttt := make(map[string]uint32)
+				babi := make(map[string][]float32)
+				for _, w := range cleanFancy[kid] {
+					tttt[w] += 1
+					babi[w] = append(babi[w], -100)
+				}
+				maxFreq := getMaxFreq(fancyInfo[kid].Freq)
+				for _, w := range cleanFancy[kid] {
+					wHash := md5.Sum([]byte(w))
+					wHashString := hex.EncodeToString(wHash[:])
+					invKeyVals := make(map[string][]float32)
+					normTF := float32(float32(tttt[w]) / float32(maxFreq))
+					invKeyVals[docHashString] = append([]float32{normTF}, babi[w]...)
+					// append the added entry (docHash and pos) to inverted file
+					// value has type of map[DocHash][]uint32 (docHash -> list of position)
+					value, err := inverted[0].Get(ctx, wHashString)
+					if err == badger.ErrKeyNotFound {
+						// there's no entry on the inverted table for the corresponding wordHash
+						if err = bw_anchor.BatchSet(ctx, wHashString, invKeyVals); err != nil {
+							panic(err)
+						}
+					} else if err != nil {
+						panic(err)
+					} else {
+						// append new docHash entry to the existing one
+						value.(map[string][]float32)[docHashString] = invKeyVals[docHashString]
+
+						// load new appended value of inverted table according to the wordHash
+						if err = bw_anchor.BatchSet(ctx, wHashString, value); err != nil {
+							panic(err)
+						}
+					}
+				}
 			} else if err != nil {
 				panic(err)
+			} else {
+				docInfoC_ := docInfoC.(database.DocInfo)
+				if docInfoC_.Parents == nil {
+					docInfoC_.Parents = make(map[string][]string)
+				}
+				docInfoC_.Parents[docHashString] = cleanFancy[kid]
+				// Set docHash of child -> docInfo of child using batch writer
+				if err = bw_child.BatchSet(ctx, kid, docInfoC); err != nil {
+					panic(err)
+				}
+				tttt := make(map[string]uint32)
+				babi := make(map[string][]float32)
+				for _, w := range cleanFancy[kid] {
+					tttt[w] += 1
+					babi[w] = append(babi[w], -100)
+				}
+				for i, w := range docInfoC_.Page_title {
+					tttt[w] += 1
+					babi[w] = append(babi[w], float32(i))
+				}
+				maxFreq := uint32(0)
+				for _, v := range tttt {
+					if v > maxFreq {
+						maxFreq = v
+					}
+				}
+				for _, w := range cleanFancy[kid] {
+					wHash := md5.Sum([]byte(w))
+					wHashString := hex.EncodeToString(wHash[:])
+					invKeyVals := make(map[string][]float32)
+					normTF := float32(float32(tttt[w]) / float32(maxFreq))
+					invKeyVals[docHashString] = append([]float32{normTF}, babi[w]...)
+					// append the added entry (docHash and pos) to inverted file
+					// value has type of map[DocHash][]uint32 (docHash -> list of position)
+					value, err := inverted[0].Get(ctx, wHashString)
+					if err == badger.ErrKeyNotFound {
+						// there's no entry on the inverted table for the corresponding wordHash
+						if err = bw_anchor.BatchSet(ctx, wHashString, invKeyVals); err != nil {
+							panic(err)
+						}
+					} else if err != nil {
+						panic(err)
+					} else {
+						// append new docHash entry to the existing one
+						value.(map[string][]float32)[docHashString] = invKeyVals[docHashString]
+
+						// load new appended value of inverted table according to the wordHash
+						if err = bw_anchor.BatchSet(ctx, wHashString, value); err != nil {
+							panic(err)
+						}
+					}
+				}
 			}
+		}
+
+		// Store the children of current doc to db for faster pagerank process
+		if err = forward[2].Set(ctx, docHashString, kids); err != nil {
+			panic(err)
 		}
 	}
 
@@ -313,7 +329,9 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	if err = bw_child.Flush(ctx); err != nil {
 		panic(err)
 	}
-
+	if err = bw_anchor.Flush(ctx); err != nil {
+		panic(err)
+	}
 
 	// PageInfo
 	// Initialize document object
@@ -337,7 +355,9 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		} else {
 			pHash := md5.Sum([]byte(parentURL))
 			pHashString := hex.EncodeToString(pHash[:])
-			pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, []string{pHashString}, wordMapping}
+			tempP := make(map[string][]string)
+			tempP[pHashString] = []string{}
+			pageInfo = database.DocInfo{*URL, pageTitle, lastModified, uint32(pageSize), kids, tempP, wordMapping}
 		}
 	}
 
@@ -345,6 +365,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	if err = forward[1].Set(ctx, docHashString, pageInfo); err != nil {
 		panic(err)
 	}
+	// mutex.Unlock()
 
 	// Cache
 	if _, err := os.Stat(DocsDir); os.IsNotExist(err) {
@@ -355,11 +376,199 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	}
 }
 
-func setInverted(ctx context.Context, word string, pos map[string][]uint32, maxFreq uint32, docHash string, forward []database.DB, inverted database.DB, bw_forward []database.BatchWriter, bw_inverted database.BatchWriter, mutex *sync.Mutex) {
+func checkAndUpdate(dI *database.DocInfo, pageTitle, kids []string, lock2 *sync.RWMutex, docHashString string,
+	bwInv []database.BatchWriter, bwFrw []database.BatchWriter, wordMapping map[string]uint32, pageSize int,
+	inverted, forward []database.DB, ctx context.Context, updateTitle, updateBody, updateKids *bool) {
+
+	// lock2.Lock()
+	// Check the doc title and remove anything related to this docHash
+	// from the titla inverted table if changed
+	if !reflect.DeepEqual(dI.Page_title, pageTitle) {
+		for _, word := range dI.Page_title {
+			h := md5.Sum([]byte(word))
+			hStr := hex.EncodeToString(h[:])
+			docP_, e := inverted[0].Get(ctx, hStr)
+			if e != nil {
+				panic(e)
+			}
+			docP, ok := docP_.(map[string][]float32)
+			if !ok {
+				panic("Type assertion failed")
+			}
+			if len(docP) > 1 {
+				// remove this doc from this row
+				delete(docP, docHashString)
+				if e = bwInv[0].BatchSet(ctx, hStr, docP); e != nil {
+					panic(e)
+				}
+			} else if docP[docHashString] != nil {
+				// delete this row
+				if e = inverted[0].Delete(ctx, hStr); e != nil {
+					panic(e)
+				}
+			}
+		}
+		*updateTitle = true
+	}
+
+	// Check the doc body and remove anything related to this docHash
+	// from the body inverted table if changed
+	if !reflect.DeepEqual(dI.Words_mapping, wordMapping) {
+		for wordHash, _ := range dI.Words_mapping {
+			docP_, e := inverted[1].Get(ctx, wordHash)
+			if e != nil {
+				panic(e)
+			}
+			docP, ok := docP_.(map[string][]float32)
+			if !ok {
+				panic("Type assertion failed")
+			}
+			if len(docP) > 1 {
+				// remove this doc from this row
+				delete(docP, docHashString)
+				if e = bwInv[1].BatchSet(ctx, wordHash, docP); e != nil {
+					panic(e)
+				}
+			} else if docP[docHashString] != nil {
+				// delete this row
+				if e = inverted[1].Delete(ctx, wordHash); e != nil {
+					panic(e)
+				}
+			}
+		}
+		*updateBody = true
+	}
+
+	// Check the doc children and delete the docHash of this page
+	// from all the children's Parent if the children is changed
+	if !reflect.DeepEqual(dI.Children, kids) {
+		for _, c := range dI.Children {
+			dIc_, e := forward[1].Get(ctx, c)
+			if e != nil {
+				panic(e)
+			}
+			dIc, ok := dIc_.(database.DocInfo)
+			if !ok {
+				panic("Type assertion failed")
+			}
+			tempParents := dIc.Parents
+			dIc.Parents = make(map[string][]string)
+			for k, t := range tempParents {
+				if k != docHashString {
+					dIc.Parents[k] = t
+				} else {
+					for _, w := range t {
+						wHash := md5.Sum([]byte(w))
+						wHashString := hex.EncodeToString(wHash[:])
+						dpw_, e := inverted[0].Get(ctx, wHashString)
+						if e != nil {
+							panic(e)
+						}
+						dpw, ok := dpw_.(map[string][]float32)
+						if !ok {
+							panic("Type assertion failed")
+						}
+						if len(dpw) > 1 {
+							// remove this doc from this row
+							delete(dpw, c)
+							if e = bwInv[0].BatchSet(ctx, wHashString, dpw); e != nil {
+								panic(e)
+							}
+						} else if dpw[c] != nil {
+							// delete this row
+							if e = inverted[0].Delete(ctx, wHashString); e != nil {
+								panic(e)
+							}
+						}
+					}
+				}
+			}
+			if e = bwFrw[1].BatchSet(ctx, c, dIc); e != nil {
+				panic(e)
+			}
+		}
+		*updateKids = true
+	}
+
+	// Check & update the anchor texts in children
+	if !*updateKids && *updateBody {
+		for _, c := range dI.Children {
+			dIc_, e := forward[1].Get(ctx, c)
+			if e != nil {
+				panic(e)
+			}
+			dIc, ok := dIc_.(database.DocInfo)
+			if !ok {
+				panic("Type assertion failed")
+			}
+			tempParents := dIc.Parents
+			dIc.Parents = make(map[string][]string)
+			for k, t := range tempParents {
+				if k != docHashString {
+					dIc.Parents[k] = t
+				} else {
+					for _, w := range t {
+						wHash := md5.Sum([]byte(w))
+						wHashString := hex.EncodeToString(wHash[:])
+						dpw_, e := inverted[0].Get(ctx, wHashString)
+						if e != nil {
+							panic(e)
+						}
+						dpw, ok := dpw_.(map[string][]float32)
+						if !ok {
+							panic("Type assertion failed")
+						}
+						if len(dpw) > 1 {
+							// remove this doc from this row
+							delete(dpw, c)
+							if e = bwInv[0].BatchSet(ctx, wHashString, dpw); e != nil {
+								panic(e)
+							}
+						} else if dpw[c] != nil {
+							// delete this row
+							if e = inverted[0].Delete(ctx, wHashString); e != nil {
+								panic(e)
+							}
+						}
+					}
+				}
+			}
+			if e = bwFrw[1].BatchSet(ctx, c, dIc); e != nil {
+				panic(e)
+			}
+		}
+	}
+
+	// Check the doc size and update if changed
+	if dI.Page_size != uint32(pageSize) {
+		dI.Page_size = uint32(pageSize)
+		if !*updateTitle && !*updateBody && !*updateKids {
+			if e := forward[1].Set(ctx, docHashString, dI); e != nil {
+				panic(e)
+			}
+		}
+	}
+
+	// Flush the writes
+	for _, f := range bwFrw {
+		if err := f.Flush(ctx); err != nil {
+			panic(err)
+		}
+	}
+	for _, i := range bwInv {
+		if err := i.Flush(ctx); err != nil {
+			panic(err)
+		}
+	}
+	// lock2.Unlock()
+}
+
+func setInverted(ctx context.Context, word string, pos map[string][]float32, maxFreq uint32, docHash string, forward []database.DB, inverted database.DB, bw_forward []database.BatchWriter, bw_inverted database.BatchWriter, mutex *sync.Mutex) {
 
 	// initialise inverted keywords values
-	invKeyVals := make(map[string][]uint32)
-	invKeyVals[docHash] = append([]uint32{0}, pos[word]...)
+	invKeyVals := make(map[string][]float32)
+	normTF := float32(len(pos[word])) / float32(maxFreq)
+	invKeyVals[docHash] = append([]float32{normTF}, pos[word]...)
 
 	// Compute the wordHash of current word
 	wordHash := md5.Sum([]byte(word))
@@ -379,10 +588,6 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, maxF
 		panic(err)
 	}
 
-	// START OF CRITICAL SECTION //
-	// LOCK //
-	mutex.Lock()
-
 	// append the added entry (docHash and pos) to inverted file
 	// value has type of map[DocHash][]uint32 (docHash -> list of position)
 	value, err := inverted.Get(ctx, wordHashString)
@@ -395,7 +600,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, maxF
 		panic(err)
 	} else {
 		// append new docHash entry to the existing one
-		value.(map[string][]uint32)[docHash] = append(value.(map[string][]uint32)[docHash], pos[word]...)
+		value.(map[string][]float32)[docHash] = invKeyVals[docHash]
 
 		// load new appended value of inverted table according to the wordHash
 		if err = bw_inverted.BatchSet(ctx, wordHashString, value); err != nil {
@@ -403,42 +608,7 @@ func setInverted(ctx context.Context, word string, pos map[string][]uint32, maxF
 		}
 	}
 
-	// END OF CRITICAL SECTION //
-	// UNLOCK //
-	mutex.Unlock()
-
 	return
-}
-
-func AddParent(currentURL_ string, parents []string,
-	forw []database.DB, wgIndexer *sync.WaitGroup) {
-
-	defer wgIndexer.Done()
-	ctx, _ := context.WithCancel(context.TODO())
-
-	// get existing docInfo corresponding to the current docHash
-	var tempdocinfo database.DocInfo
-	docHash := md5.Sum([]byte(currentURL_))
-	docHashString := hex.EncodeToString(docHash[:])
-	tempdocinfoB, err := forw[1].Get(ctx, docHashString)
-	if err != nil {
-		fmt.Println(docHashString, "=", currentURL_)
-		panic(err)
-	}
-	tempdocinfo = tempdocinfoB.(database.DocInfo)
-
-	// append the parents to the docInfo
-	for _, pURL := range parents {
-		pHash := md5.Sum([]byte(pURL))
-		pHashString := hex.EncodeToString(pHash[:])
-		tempdocinfo.Parents = append(tempdocinfo.Parents, pHashString)
-	}
-
-	// add back the docInfo with appended parents
-	if err = forw[1].Set(ctx, docHashString, tempdocinfo); err != nil {
-		panic(err)
-	}
-
 }
 
 func getMaxFreq(in map[string]uint32) (ret uint32) {

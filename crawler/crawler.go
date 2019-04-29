@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"github.com/eapache/channels"
 	"golang.org/x/net/html"
+	"golang.org/x/sync/semaphore"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"the-SearchEngine/database"
@@ -53,14 +54,21 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				if len(thisURL) < 4 ||
 					(thisURL[:4] != "http" && thisURL[:4] != "www.") {
 
+					baseURLtype, e := url.Parse(baseURL)
+					if e != nil {
+						panic(e)
+					}
+					hn := baseURLtype.Hostname()
+					sc := baseURLtype.Scheme
+
 					if thisURL[0] != '/' {
 						head := urlRe.ReplaceAllString(baseURL, "")
-						tail := urlRe.ReplaceAllString(baseURL + "/" + thisURL, "")
+						tail := urlRe.ReplaceAllString(sc+"://"+hn+"/"+thisURL, "")
 						queue.In() <- []string{head, tail}
 						children[tail] = true
 					} else {
 						head := urlRe.ReplaceAllString(baseURL, "")
-						tail := urlRe.ReplaceAllString(baseURL + thisURL, "")
+						tail := urlRe.ReplaceAllString(sc+"://"+hn+thisURL, "")
 						queue.In() <- []string{head, tail}
 						children[tail] = true
 					}
@@ -80,16 +88,16 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 	}
 }
 
-func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
+func Crawl(sem *semaphore.Weighted, parentURL string,
 	currentURL string, errorsChannel *channels.InfiniteChannel, client *http.Client,
 	lock2 *sync.RWMutex, queue *channels.InfiniteChannel, mutex *sync.Mutex,
 	inv []database.DB, forw []database.DB) {
 
-	defer wg.Done()
+	defer sem.Release(1)
 
 	innerStart := time.Now()
 	resp, err := client.Get(currentURL)
-	fmt.Println("Goroutine id " + strconv.Itoa(idx) + " visited " + currentURL + " (elapsed time: " + time.Now().Sub(innerStart).String() + ")")
+	fmt.Println("Visited " + currentURL + " (elapsed time: " + time.Now().Sub(innerStart).String() + ")")
 
 	if err != nil {
 		errorsChannel.In() <- currentURL
@@ -135,7 +143,9 @@ func Crawl(idx int, wg *sync.WaitGroup, parentURL string,
 		childsArr = append(childsArr, k)
 	}
 
+	mutex.Lock()
 	indexer.Index(htmlData, currentURL, lock2, lm, ps, mutex, inv, forw, parentURL, childsArr)
+	mutex.Unlock()
 
 	resp.Body.Close()
 }

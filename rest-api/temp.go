@@ -17,8 +17,9 @@ type docResult struct {
 	Children      []string          `json:"Children"`
 	Parents       []string          `json:"Parents"`
 	Words_mapping map[string]uint32 `json:"Words_mapping"`
-	PageRank      float64		`json:"PageRank"`
-	FinalRank     float64		`json:"FinalRank"`
+	PageRank      float64           `json:"PageRank"`
+	FinalRank     float64           `json:"FinalRank"`
+	Summary				[]string					`json:"Summary"`
 }
 
 type request struct {
@@ -49,6 +50,9 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		temp1 := make(map[string]uint32)
 		temp1["wordHash1"] = uint32(11)
 		temp1["wordHash2"] = uint32(22)
+		temp1["wordHash3"] = uint32(33)
+		temp1["wordHash4"] = uint32(44)
+		temp1["wordHash5"] = uint32(55)
 
 		doc1 := docResult {
 			Url: *temp,
@@ -60,6 +64,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 			Words_mapping: temp1,
 			PageRank: 0.52341,
 			FinalRank: 0.6879,
+			Summary: []string{"This is a 20 word summary. I think. It's actually just a ballpark whoops"},
 		}
 		doc2 := docResult {
 			Url: *temp_,
@@ -71,6 +76,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 			Words_mapping: temp1,
 			PageRank: 0.841,
 			FinalRank: 0.984,
+			Summary: []string{"This is a 20 word summary. I think. It's actually just a ballpark whoops"},
 		}
 
 		ret := []docResult{doc2, doc1}

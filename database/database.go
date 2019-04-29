@@ -7,9 +7,12 @@ import (
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
 	bpb "github.com/dgraph-io/badger/pb"
+	"github.com/eapache/channels"
 	"github.com/pkg/errors"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,7 +40,6 @@ type (
 	// TODO: add logger debug in each function
 	DB interface {
 		// TODO: integrate prefix search
-
 		// return nil if key not found
 		Get(ctx context.Context, key interface{}) (value interface{}, err error)
 
@@ -63,6 +65,9 @@ type (
 
 		// ONLY USE FOR DEBUGGING PURPOSES
 		Debug_Print(ctx context.Context) error
+
+		// db iterate for server
+		IterateInv(ctx context.Context, pre string, frw0 DB) ([]string, error)
 	}
 
 	BadgerDB struct {
@@ -72,7 +77,6 @@ type (
 		valType string
 	}
 )
-
 
 type (
 	BatchWriter interface {
@@ -117,8 +121,8 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 
 	// directory of table is mapped to the configurations (table loading mode, key data type, and value data type). Data type is stored to support schema enforcement
 	inverted := [][]string{
-		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
-		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]uint32"},
+		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
+		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
 	}
 
 	forward := [][]string{
@@ -126,6 +130,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 		[]string{"DocHash_docInfo/", strconv.Itoa(loadMode), "string", "DocInfo"},
 		[]string{"DocHash_children/", strconv.Itoa(loadMode), "string", "[]string"},
 		[]string{"DocHash_rank/", strconv.Itoa(loadMode), "string", "float64"},
+		[]string{"DocHash_magnitude/", strconv.Itoa(loadMode), "string", "map[string]float64"},
 	}
 
 	// create directory if not exist
@@ -199,7 +204,7 @@ func getOpts(loadMethod int, dir string) (opts badger.Options) {
 	opts.Dir, opts.ValueDir = dir, dir
 
 	// if false, SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
-	opts.SyncWrites = true
+	opts.SyncWrites = false
 
 	// loadMethod: default is MemoryMap, 1 for loading to memory (LoadToRAM), 2 for storing all into disk (FileIO) which resulted in extensive disk IO
 	switch loadMethod {
@@ -410,4 +415,46 @@ func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {
 		return nil
 	})
 	return err
+}
+
+func (bdb *BadgerDB) IterateInv(ctx context.Context, pre string, frw0 DB) ([]string, error) {
+	var retVal []string
+	arrChan := channels.NewInfiniteChannel()
+
+	err := bdb.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		var wg sync.WaitGroup
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			wg.Add(1)
+			go func(k string) {
+				defer wg.Done()
+				w_, e := frw0.Get(ctx, k)
+				if e != nil {
+					panic(e)
+				}
+				w := w_.(string)
+				if strings.HasPrefix(w, pre) {
+					arrChan.In() <- w
+				}
+			}(string(item.Key()))
+		}
+		wg.Wait()
+		for arrChan.Len() > 0 {
+			if x, ok := (<-arrChan.Out()).(string); ok {
+				retVal = append(retVal, x)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	} else {
+		return retVal, nil
+	}
 }

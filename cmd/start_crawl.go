@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
+	"golang.org/x/sync/semaphore"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"sync"
 	"the-SearchEngine/crawler"
 	"the-SearchEngine/database"
-	"the-SearchEngine/indexer"
 	"the-SearchEngine/ranking"
 	"time"
 )
@@ -31,15 +31,13 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	startURL := "https://www.cse.ust.hk"
-	numOfPages := 500
+	numOfPages := 300
 	maxThreadNum := 100
+	sem := semaphore.NewWeighted(int64(maxThreadNum))
 	domain := "ust.hk"
-	unreachableURLs := make(map[string]bool)
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
 	errorsChannel := channels.NewInfiniteChannel()
-	var wg sync.WaitGroup
-	var wgIndexer sync.WaitGroup
 	var mutex sync.Mutex
 	var lock2 sync.RWMutex
 
@@ -55,14 +53,12 @@ func main() {
 
 	queue.In() <- []string{"", startURL}
 
-	parentsToBeAdded := make(map[string][]string)
-
 	depth := 0
 	nextDepthSize := 1
 	fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
 
 	for len(visited) < numOfPages {
-		for idx := 0; queue.Len() > 0 && idx < maxThreadNum && len(visited) < numOfPages && nextDepthSize > 0; idx++ {
+		for queue.Len() > 0 && len(visited) < numOfPages && nextDepthSize > 0 {
 			if edge, ok := (<-queue.Out()).([]string); ok {
 
 				nextDepthSize -= 1
@@ -74,10 +70,8 @@ func main() {
 				if visited[md5.Sum([]byte(currentURL))] {
 					/*
 						If currentURL is already visited (handle cycle),
-						do not visit this URL and do not increase the idx
+						do not visit this URL
 					*/
-					idx--
-					parentsToBeAdded[currentURL] = append(parentsToBeAdded[currentURL], parentURL)
 					continue
 				}
 
@@ -87,7 +81,6 @@ func main() {
 					panic(e)
 				}
 				if !strings.HasSuffix(u.Hostname(), domain) {
-					idx--
 					continue
 				}
 
@@ -95,10 +88,12 @@ func main() {
 				visited[md5.Sum([]byte(currentURL))] = true
 
 				/* Add below goroutine (child) to the list of children to be waited */
-				wg.Add(1)
+				if e = sem.Acquire(ctx, 1); e != nil {
+					panic(e)
+				}
 
 				/* Crawl the URL using goroutine */
-				go crawler.Crawl(idx, &wg, parentURL, currentURL, errorsChannel,
+				go crawler.Crawl(sem, parentURL, currentURL, errorsChannel,
 					client, &lock2, queue, &mutex, inv, forw)
 
 			} else {
@@ -107,7 +102,9 @@ func main() {
 		}
 
 		/* Wait for all children to finish */
-		wg.Wait()
+		if e := sem.Acquire(ctx, int64(maxThreadNum)); e != nil {
+			panic(e)
+		}
 
 		/*
 			Run function AddParent using goroutine
@@ -118,17 +115,10 @@ func main() {
 			URL are already mapped to some doc id
 		*/
 		for errorsChannel.Len() > 0 {
-			if x, ok := (<-errorsChannel.Out()).(string); ok {
-				unreachableURLs[x] = true
+			if _, ok := (<-errorsChannel.Out()).(string); ok {
+				numOfPages += 1
 			} else {
 				os.Exit(1)
-			}
-		}
-		wgIndexer.Wait()
-		for cURL, parents := range parentsToBeAdded {
-			if !unreachableURLs[cURL] {
-				wgIndexer.Add(1)
-				go indexer.AddParent(cURL, parents, forw, &wgIndexer)
 			}
 		}
 
@@ -145,17 +135,24 @@ func main() {
 			fmt.Println("\n\n[DEBUG] QUEUE EMPTY\n\n")
 			break
 		}
+
+		sem.Release(int64(maxThreadNum))
 	}
 
 	/* Close the queue channel */
 	queue.Close()
 
 	/* Wait for all indexers to finish */
-	wgIndexer.Wait()
+	// wgIndexer.Wait()
 	fmt.Println("\nTotal visited length:", len(visited))
-	fmt.Println("\nTotal elapsed time: " + time.Now().Sub(start).String())
+	fmt.Println("\nTotal crawling and indexing time: " + time.Now().Sub(start).String())
 	
+	// perform database update
 	timer := time.Now()
-	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw) 
-	fmt.Println("Updating pagerank (including read and write to db) takes", time.Since(timer))
+	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw)
+	ranking.UpdateTermWeights(ctx, &inv[0], &forw[4], "title")
+	ranking.UpdateTermWeights(ctx, &inv[1], &forw[4], "body")
+
+	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
+	fmt.Println("\nTotal elapsed time: " ,time.Now().Sub(start).String())
 }

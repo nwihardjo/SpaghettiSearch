@@ -16,10 +16,12 @@ class ResultCard extends Component {
     Parents: [],
     Words_mapping:{},
     PageRank: 0,
-    FinalRank: 0}
+    FinalRank: 0,
+    Summary: ""}
   }
   componentDidMount (props) {
     // extract only the date
+    console.log(this.props.data['Summary'])
     var date=this.props.data['Mod_date'].match(/(\d{4})-(\d{2})-(\d{2})/)
     this.setState({Url: this.props.data['Url']['Host'],
                   Mod_date: date[0],
@@ -29,7 +31,8 @@ class ResultCard extends Component {
                   Parents: this.props.data['Parents'],
                   Words_mapping: this.props.data['Words_mapping'],
                   PageRank: this.props.data['PageRank'],
-                  FinalRank: this.props.data['FinalRank']});
+                  FinalRank: this.props.data['FinalRank'],
+                  Summary: this.props.data['Summary']});
   }
   render() {
     return (
@@ -45,16 +48,21 @@ class ResultCard extends Component {
         </CardBody>
         <CardBody>
           <CardText>
-          {
-            this.state.Children.map((link, i) => {
-              return(<div>{link}<br/></div>)
-            })
-          }
+          {this.state.Summary} <br/>
+          <small className="text-muted">
+          <b> Parents: </b>
           {
             this.state.Parents.map((link, i) => {
               return(<div>{link}<br/></div>)
             })
           }
+          <b> Children: </b>
+          {
+            this.state.Children.map((link, i) => {
+              return(<div>{link}<br/></div>)
+            })
+          }
+          </small>
           </CardText>
         </CardBody>
         <CardBody>
