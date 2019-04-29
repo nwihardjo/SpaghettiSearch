@@ -46,39 +46,6 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	log.Print("Query processed in ", time.Since(timer))
 }
 
-func GetWordList(w http.ResponseWriter, r *http.Request) {
-	log.Print("Getting word list...")
-
-	pre := mux.Vars(r)["pre"]
-
-	setHeader(w)
-
-	tempT, err := inv[0].IterateInv(ctx, pre, forw[0])
-	if err != nil {
-		panic(err)
-	}
-	tempB, err := inv[1].IterateInv(ctx, pre, forw[0])
-	if err != nil {
-		panic(err)
-	}
-	merged_ := make(map[string]bool)
-	for _, i := range tempT {
-		merged_[i] = true
-	}
-	for _, i := range tempB {
-		merged_[i] = true
-	}
-	tempT = []string{}
-	tempB = []string{}
-	var merged []string
-	for k, _ := range merged_ {
-		merged = append(merged, k)
-		delete(merged_, k)
-	}
-	sort.Sort(sort.StringSlice(merged))
-	json.NewEncoder(w).Encode(merged)
-}
-
 func main() {
 	// initialise db connection
 	ctx, cancel := context.WithCancel(context.TODO())
