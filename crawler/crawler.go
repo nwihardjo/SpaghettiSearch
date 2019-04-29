@@ -63,7 +63,7 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 
 					if thisURL[0] != '/' {
 						head := urlRe.ReplaceAllString(baseURL, "")
-						tail := urlRe.ReplaceAllString(sc+"://"+hn+"/"+thisURL, "")
+						tail := urlRe.ReplaceAllString(baseURL+"/"+thisURL, "")
 						queue.In() <- []string{head, tail}
 						children[tail] = true
 					} else {
