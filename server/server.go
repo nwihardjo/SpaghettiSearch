@@ -148,7 +148,7 @@ func computeFinalRank(ctx context.Context, docs <- chan Rank_result, forw []db.D
 		for doc := range docs {
 			// get doc metadata using future pattern for faster performance
 			metadata := getDocInfo(ctx, doc.DocHash, forw)
-
+			
 			// get pagerank value
 			var PR float64
 			if tempVal, err := forw[3].Get(ctx, doc.DocHash); err != nil {
@@ -197,16 +197,12 @@ func getDocInfo(ctx context.Context, docHash string, forw []db.DB) <-chan Rank_c
 		
 		parentChan := convertHashDocinfo(ctx, ret.Parents, forw)
 		childrenChan := convertHashDocinfo(ctx, ret.Children, forw)
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go convertHashWords(&wg, ctx, ret.Words_mapping, forw)
+		wordmapChan := convertHashWords(ctx, ret.Words_mapping, forw)
 
 		ret.Parents = <-parentChan
 		ret.Children = <-childrenChan
+		ret.Words_mapping = <- wordmapChan
 
-		wg.Wait()
-		log.Print("DEBUG getting doc info finished")
 		out <- ret
 	}()
 	return out
@@ -214,13 +210,19 @@ func getDocInfo(ctx context.Context, docHash string, forw []db.DB) <-chan Rank_c
 
 func convertHashDocinfo(ctx context.Context, docHashes []string, forw []db.DB) <-chan []string{
 	out := make(chan []string, 1)
-	
+
+	// early stopping
+	if docHashes == nil || len(docHashes) == 0{
+		out <- nil
+		return out
+	}	
+
 	go func() {
 		// generate common input
 		docHashInChan := genTermPipeline(docHashes)
 		
 		// fan-out to several getter
-		numFanOut := int(math.Ceil(float64(len(docHashes)) * 0.75))
+		numFanOut := len(docHashes)
 		docOutChan := [](<-chan string){}
 		for i := 0; i < numFanOut; i++ {
 			docOutChan = append(docOutChan, retrieveUrl(ctx, docHashInChan, forw))
@@ -243,6 +245,7 @@ func retrieveUrl(ctx context.Context, docHashIn <-chan string, forw []db.DB) <-c
 		for docHash := range docHashIn {
 			var url string
 			if val, err := forw[1].Get(ctx, docHash); err != nil {
+				log.Print("DEBUG DOCHASH", docHash)
 				panic(err)
 			} else {
 				doc := val.(db.DocInfo)
@@ -335,32 +338,39 @@ func retrieveWord(ctx context.Context, wordInChan <-chan string, forw []db.DB) <
 	return out
 }
 
-func convertHashWords(wg *sync.WaitGroup, ctx context.Context, wordMap map[string]uint32, forw []db.DB) {
-	defer wg.Done()
-	// generate common channel for word input
-	wordInChan := genWordPipeline(wordMap)
+func convertHashWords(ctx context.Context, wordMap map[string]uint32, forw []db.DB) <-chan map[string]uint32{
+	out := make(chan map[string]uint32, 1)
 
-	// fan-out to multiple workers to get the word in string
-	numFanOut := int(math.Ceil(float64(len(wordMap))))
-	wordOutChan := [] (<-chan map[string]string){}
-	for i := 0; i < numFanOut; i ++ {
-		wordOutChan = append(wordOutChan, retrieveWord(ctx, wordInChan, forw))
+	// early stopping	
+	if wordMap == nil || len(wordMap) == 0 {
+		out <- nil
+		return out
 	}
 
-	// fan-in word hash mapping
-	wordHashMap := make(map[string]string, len(wordMap))
-	for hashToWord := range fanInWords(wordOutChan) {
-		for wordHash, wordStr := range hashToWord {
-			wordHashMap[wordHash] = wordStr
+	go func() {
+		// generate common channel for word input
+		wordInChan := genWordPipeline(wordMap)
+
+		// fan-out to multiple workers to get the word in string
+		// word list is limited to 5
+		numFanOut := len(wordMap)
+		wordOutChan := [] (<-chan map[string]string){}
+		for i := 0; i < numFanOut; i ++ {
+			wordOutChan = append(wordOutChan, retrieveWord(ctx, wordInChan, forw))
 		}
-	}
-	
-	// assign the frequency to word in string
-	for wordHash, freq := range wordMap {
-		delete(wordMap, wordHash)
-		wordMap[wordHashMap[wordHash]] = freq
-	}
-	return
+
+		// fan-in word hash mapping
+		ret := make(map[string]uint32, len(wordMap))
+		for hashToWord := range fanInWords(wordOutChan) {
+			for wordHash, wordStr := range hashToWord {
+				ret[wordStr] = wordMap[wordHash]
+			}
+		}
+		
+		out <- ret
+		close(out)
+	}()
+	return out
 }
 
 func genPhrasePipeline(listStr []string) <- chan termPhrase {
@@ -430,7 +440,7 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 		phraseInChan := genPhrasePipeline(phraseTokenised)
 
 		// fan-out to get term occurence from inverted tables
-		numFanOut := len(phraseTokenised)
+		numFanOut := int(math.Ceil(float64(len(phraseTokenised)) * 0.75))
 		termOutChan := [] (<-chan map[string]Rank_term){}
 		for i := 0; i < numFanOut; i ++ {
 			termOutChan = append(termOutChan, getPosTerm(ctx, phraseInChan, inv))

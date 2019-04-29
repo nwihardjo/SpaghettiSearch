@@ -4,6 +4,7 @@ import (
 	"time"
 	"regexp"
 	"sort"
+	"strings"
 	db "the-SearchEngine/database"
 )
 
@@ -22,7 +23,7 @@ type Rank_result struct {
 
 type Rank_combined struct {
 	Url           string        		   `json:"Url"`
-	Page_title    []string       		   `json:"Page_title"`
+	Page_title    string       		   `json:"Page_title"`
 	Mod_date      time.Time      		   `json:"Mod_date"`
 	Page_size     uint32         		   `json:"Page_size"`
 	Children      []string       		   `json:"Children"`
@@ -37,6 +38,11 @@ type termPhrase struct {
 	Pos	uint8
 }
 
+type kv_sort struct {
+	Key	string
+	Value	uint32
+}
+
 func appendSort(data []Rank_combined, el Rank_combined) []Rank_combined {
 	index := sort.Search(len(data), func(i int) bool { return data[i].FinalRank < el.FinalRank })
 	data = append(data, Rank_combined{})
@@ -46,24 +52,97 @@ func appendSort(data []Rank_combined, el Rank_combined) []Rank_combined {
 }
 
 func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combined {
-	parentList := make([]string, len(metadata.Parents))
-	idx := 0
-	for parentHash, _ := range metadata.Parents {
-		parentList[idx] = parentHash
-		idx++
-	}
+	// only get first 5 children and parents
+	var parentList, childList []string
+	if len(metadata.Parents) == 0 {
+		parentList = nil
+	} else {
+		count := 0
+		// metadata.Parents is map[string][]string
+		for parentHash, _ := range metadata.Parents {
+			if parentHash == "" {
+				continue
+			}
 
+			if count == 0 {
+				parentList = []string{parentHash}
+			} else {
+				parentList = append(parentList, parentHash)
+			}
+			parentList[count] = parentHash
+			count ++ 
+			if count == 5 {
+				break
+			}
+		}
+	}
+	
+	if len(metadata.Children) == 0 {
+		childList = nil
+	} else {
+		// metadata.Children is []string
+		for idx, childHash := range metadata.Children {
+			if childHash == "" {
+				continue 
+			}
+
+			if len(childList) == 0 {
+				childList = []string{childHash}
+			} else {
+				childList = append(childList, childHash)
+			}
+			if idx == 4 {
+				break
+			}
+		}
+	}
+	
 	return Rank_combined {
 		Url		:	metadata.Url.String(),
-		Page_title	:	metadata.Page_title,
+		Page_title	:	strings.Join(metadata.Page_title, " "),
 		Mod_date	:	metadata.Mod_date,
 		Page_size	:	metadata.Page_size,
-		Children	:	metadata.Children,
+		Children	:	childList,
 		Parents		:	parentList,
-		Words_mapping	:	metadata.Words_mapping,
+		Words_mapping	:	sortMap(metadata.Words_mapping),
 		PageRank	:	PR,
 		FinalRank	:	finalRank,
 	}
+}
+
+func sortMap(m map[string]uint32) map[string]uint32 {
+	if len(m) == 0 {
+		return nil
+	}
+
+	ss := make([]kv_sort, len(m))
+	for k, v := range m {
+		ss = append(ss, kv_sort{k, v})
+	}
+	
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].Value > ss[j].Value
+	})
+
+	count := 0
+	threshold := 0
+	var ret map[string]uint32
+	if len(m) > 5 {
+		ret = make(map[string]uint32, 5)
+		threshold = 5
+	} else {
+		ret = make(map[string]uint32, len(m))
+		threshold = len(m)
+	}
+	
+	for _, kv := range ss {
+		ret[kv.Key] = kv.Value
+		count ++ 
+		if count == threshold {
+			break
+		}
+	}
+	return ret
 }
 
 var re = regexp.MustCompile(`".*?"`)
