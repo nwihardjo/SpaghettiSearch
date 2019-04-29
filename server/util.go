@@ -57,21 +57,18 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combi
 	if len(metadata.Parents) == 0 {
 		parentList = nil
 	} else {
-		count := 0
 		// metadata.Parents is map[string][]string
 		for parentHash, _ := range metadata.Parents {
 			if parentHash == "" {
 				continue
 			}
 
-			if count == 0 {
+			if len(parentList) == 0 {
 				parentList = []string{parentHash}
 			} else {
 				parentList = append(parentList, parentHash)
 			}
-			parentList[count] = parentHash
-			count ++ 
-			if count == 5 {
+			if len(parentList) == 5 {
 				break
 			}
 		}
@@ -81,7 +78,7 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combi
 		childList = nil
 	} else {
 		// metadata.Children is []string
-		for idx, childHash := range metadata.Children {
+		for _, childHash := range metadata.Children {
 			if childHash == "" {
 				continue 
 			}
@@ -91,7 +88,7 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combi
 			} else {
 				childList = append(childList, childHash)
 			}
-			if idx == 4 {
+			if len(childList) == 5 {
 				break
 			}
 		}
