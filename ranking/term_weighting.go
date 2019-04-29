@@ -1,12 +1,12 @@
 package ranking
 
 import (
+	"context"
 	"encoding/json"
-	"math"
 	"io/ioutil"
+	"math"
 	db "the-SearchEngine/database"
 	"the-SearchEngine/indexer"
-	"context"
 )
 
 func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string) {
@@ -24,9 +24,9 @@ func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string
 	if err != nil {
 		panic(err)
 	}
-	
+
 	pageMagnitude := make(map[string]float64, int(totalDocs))
-	
+
 	// iterate through each row in table to compute tf-idf
 	for i := 0; i < len(comp.KV); i++ {
 		// extract key-value pair from db
@@ -37,7 +37,7 @@ func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string
 		}
 
 		idf := float32(math.Log2(totalDocs / float64(len(val))))
-		
+
 		// compute tf-idf for each docs in that term
 		for docHash, listPos := range val {
 			// first entry of list position is normalised tf
@@ -45,7 +45,7 @@ func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string
 			val[docHash] = listPos
 			pageMagnitude[docHash] += float64(listPos[0] * listPos[0])
 		}
-		
+
 		if err = bw.BatchSet(ctx, key, val); err != nil {
 			panic(err)
 		}
@@ -64,12 +64,12 @@ func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *
 	if err != nil {
 		panic(err)
 	}
-	
+
 	// base case: db is empty, computing magnitude for the first time
 	if len(comp.KV) == 0 {
 		bw := (*forw).BatchWrite_init(ctx)
 		defer bw.Cancel(ctx)
-		
+
 		for docHash, magnitude := range pageMagnitude {
 			if err = bw.BatchSet(ctx, docHash, map[string]float64{info: math.Sqrt(magnitude)}); err != nil {
 				panic(err)
@@ -94,7 +94,7 @@ func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *
 			if err = json.Unmarshal(comp.KV[i].Value, &tempVal); err != nil {
 				panic(err)
 			}
-			
+
 			// append provided magnitude to the value of the table
 			tempVal[info] = math.Sqrt(pageMagnitude[key[i]])
 			delete(pageMagnitude, key[i])
@@ -107,10 +107,10 @@ func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *
 			val = append(val, map[string]float64{info: math.Sqrt(magnitude)})
 		}
 
-		// batch write to db 
+		// batch write to db
 		bw := (*forw).BatchWrite_init(ctx)
 		defer bw.Cancel(ctx)
-		
+
 		for i := 0; i < len(key); i++ {
 			if err = bw.BatchSet(ctx, key[i], val[i]); err != nil {
 				panic(err)

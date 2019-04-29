@@ -1,11 +1,11 @@
 package ranking
 
 import (
-	db "the-SearchEngine/database"
-	"math"
+	"context"
 	"encoding/json"
 	"log"
-	"context"
+	"math"
+	db "the-SearchEngine/database"
 )
 
 // table 1 key: docHash (type: string) value: list of child (type: []string)
@@ -13,13 +13,13 @@ import (
 
 func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB) {
 	log.Printf("Ranking with damping factor='%f', convergence_criteria='%f'", dampingFactor, convergenceCriterion)
-	
-	// get the data 
+
+	// get the data
 	nodesCompressed, err := forward[2].Iterate(ctx)
 	if err != nil {
 		panic(err)
 	}
-	
+
 	// extract the data from stream
 	webNodesAll := make(map[string]struct{})
 	webNodes := make(map[string][]string, len(nodesCompressed.KV))
@@ -30,7 +30,7 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 		}
 
 		// add childhash to list of webnodes
-		for _, childHash := range tempVal { 
+		for _, childHash := range tempVal {
 			webNodesAll[childHash] = struct{}{}
 		}
 
@@ -39,10 +39,10 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	}
 
 	setWebNodes := make([]string, 0, len(webNodesAll))
-	for k, _ := range webNodesAll{
+	for k, _ := range webNodesAll {
 		setWebNodes = append(setWebNodes, k)
 	}
-	
+
 	// use number of web nodes for more efficient memory allocation
 	n := len(setWebNodes)
 	log.Printf("number of webpages indexed %d", n)
@@ -54,7 +54,7 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	// perform several computation until convergence is ensured
 	for iteration, lastChange := 1, math.MaxFloat64; lastChange > convergenceCriterion; iteration++ {
 		currentRank, lastRank = lastRank, currentRank
-		
+
 		// clear out old values
 		if iteration > 1 {
 			for _, docHash := range setWebNodes {
@@ -78,7 +78,7 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 			currentRank[docHash] = (rank + teleportProbs) / totalValue
 			lastChange += math.Abs(currentRank[docHash] - lastRank[docHash])
 		}
-	
+
 		log.Printf("Pagerank iteration #%d delta=%f", iteration, lastChange)
 	}
 	// store to database
@@ -88,7 +88,7 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 	return
 }
 
-func computeRankInherited(currentRank map[string]float64, lastRank map[string]float64, dampingFactor float64, webNodes map[string][]string) float64{
+func computeRankInherited(currentRank map[string]float64, lastRank map[string]float64, dampingFactor float64, webNodes map[string][]string) float64 {
 	totalValue := 0.0
 
 	// perform single power iteration --> d*(PR(parent)/CR(parent))
@@ -97,7 +97,7 @@ func computeRankInherited(currentRank map[string]float64, lastRank map[string]fl
 		if len(webNodes[parentHash]) == 0 {
 			continue
 		}
-		
+
 		weightPassedDown := dampingFactor * lastRank[parentHash] / float64(len(webNodes[parentHash]))
 		totalValue += weightPassedDown
 
@@ -112,13 +112,13 @@ func computeRankInherited(currentRank map[string]float64, lastRank map[string]fl
 func saveRanking(ctx context.Context, table db.DB, currentRank map[string]float64) (err error) {
 	bw := table.BatchWrite_init(ctx)
 	defer bw.Cancel(ctx)
-	
-	// feed batch writer with the rank of each page 
+
+	// feed batch writer with the rank of each page
 	for docHash, rank := range currentRank {
-		if err = bw.BatchSet(ctx, docHash, rank); err != nil {	
+		if err = bw.BatchSet(ctx, docHash, rank); err != nil {
 			return err
 		}
 	}
-	
+
 	return bw.Flush(ctx)
 }
