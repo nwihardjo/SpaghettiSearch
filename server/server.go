@@ -19,6 +19,10 @@ var forw []db.DB
 var inv []db.DB
 var ctx context.Context
 
+type request struct {
+	Query string `json:"query"`
+}
+
 func setHeader(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -27,23 +31,25 @@ func setHeader(w http.ResponseWriter) {
 
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	setHeader(w)
-	//---------------- QUERY PARSING ----------------//
+	if r.Method == "OPTIONS" {
+		return
+	}
+	log.Print(r.Body)
 
-	params := mux.Vars(r)
-	query := params["terms"]
-	// if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
-	// 	panic(err)
-	// }
+	if r.Method == "POST" {
+		var query request
+		if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
+			panic(err)
+		}
 
-	query = strings.Replace(query, "-", " ", -1)
-	log.Print("Querying terms:", query)
-	timer := time.Now()
+		log.Print("Querying terms:", query)
 
-	result := retrieval.Retrieve(query, ctx, forw, inv)
+		timer := time.Now()
+		result := retrieval.Retrieve(query, ctx, forw, inv)
+		json.NewEncoder(w).Encode(result)
 
-	json.NewEncoder(w).Encode(result)
-
-	log.Print("Query processed in ", time.Since(timer))
+		log.Print("Query processed in ", time.Since(timer))
+	}
 }
 
 func GetWordList(w http.ResponseWriter, r *http.Request) {
