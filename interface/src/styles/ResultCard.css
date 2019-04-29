@@ -1,0 +1,24 @@
+.row {
+  display: flex;
+  justify-content: flex-start;
+  margin-left: 0rem;
+  margin-top: 0.5rem;
+}
+.custom.card {
+  margin: 5px 5px 5px 5px;
+  max-width: 400px;
+}
+.custom.card > .card-body > .title.card-link {
+  font-size: 1.2rem;
+  /* color: #000000; */
+  color: #56CCF2;
+}
+.custom.card > .card-body > .title.card-link:hover {
+  font-size: 1.2rem;
+  color: #2D9CDB;
+  /* color: #2F80ED; */
+}
+.custom.card > .card-body > .card-subtitle {
+  font-size: 0.9rem;
+  color: rgba(0,0,0,0.7);
+}

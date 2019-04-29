@@ -1,0 +1,25 @@
+.searchbox--results.form-control{
+  width: 35vw;
+  min-width: 100px;
+  /* border-radius: 5px; */
+  font-size:1rem;
+}
+
+.searchbox--results.form-control:focus,
+.searchbox--results.form-control:hover{
+  box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.07);
+    /* border: 1px solid #ced4da; */
+    border: 1px solid #000000;
+  /* border-color: #56CCF2; */
+}
+
+.header.navbar.navbar-light.bg-faded {
+  border-bottom: 0.5px solid rgba(0,0,0,0.2);
+  padding: 1.5rem 2rem;
+  /* border-color: #2F80ED; */
+}
+
+.header .navbar-brand {
+  font-size: 1.7rem;
+  margin-right: 1.5rem;
+}

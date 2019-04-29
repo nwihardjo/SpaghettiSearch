@@ -1,0 +1,29 @@
+.App {
+  display: flex;
+  flex-wrap:wrap;
+  justify-content: center;
+  align-items: center;
+  width:100vw;
+  height:100vh;
+}
+.App h1{
+  font-size:5.5rem;
+}
+.searchbox--main.form-control{
+  width: 40vw;
+  min-width: 200px;
+  border-radius: 30px;
+  font-size:1rem;
+}
+
+.searchbox--main.form-control:focus,
+.searchbox--main.form-control:hover{
+  box-shadow: 3px 4px rgba(0,0,0,0.7);
+  border-color: rgba(0,0,0,0.7);
+  border-width: 2px;
+}
+/* .searchbox--main.form-control:hover{
+  box-shadow: 3px 4px;
+  border-color: #101010;
+  border-width: 3px;
+} */
