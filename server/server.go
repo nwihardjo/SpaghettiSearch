@@ -167,6 +167,7 @@ func computeFinalRank(ctx context.Context, docs <- chan Rank_result, forw []db.D
 			
 			// compute final rank
 			queryMagnitude := math.Sqrt(float64(queryLength))
+
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
 			
@@ -448,15 +449,20 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 		// fan-in the docs, and group the weights based on the phrase's term position
 		aggregatedResult := make(map[string](map[uint8]Rank_term))
 		for docsMatched := range fanInDocs(termOutChan) {
+			// below iterate through a map[string]Rank_term
 			for docHash, ranks := range docsMatched {
 				val_ := aggregatedResult[docHash]
 				if val_ == nil {
 					val_ = make(map[uint8]Rank_term)
 				}
 
+				// assign variable to the respective position term
+				// will not append to the already existing termPos
 				val := val_[ranks.TermPos]
-				val.TitleWeights = append(val.TitleWeights, ranks.TitleWeights...)
-				val.BodyWeights = append(val.BodyWeights, ranks.BodyWeights...)
+				val.TitleWeights = ranks.TitleWeights
+				val.BodyWeights = ranks.BodyWeights
+				// val.TitleWeights = append(val.TitleWeights, ranks.TitleWeights...)
+				// val.BodyWeights = append(val.BodyWeights, ranks.BodyWeights...)
 				val_[ranks.TermPos] = val
 				aggregatedResult[docHash] = val_
 			}
@@ -465,37 +471,52 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 		ret := make(map[string]Rank_term)		
 
 		// evaluate and return only documents containing the phrase
+		// termWeights below is map[uint8]Rank_term
 		for docHash, termWeights := range aggregatedResult {
-			deleteBody, deleteTitle := false, false
 			var sumBodyWeight, sumTitleWeight float32
+			var bodyIntersect, titleIntersect []float32
 
-			// numFanOut equals to the number of word in the phrase
-			if len(termWeights) != numFanOut {
-				deleteBody, deleteTitle = true, true
+			// length of termWeights should equal to the phraseToken
+			if len(termWeights) != len(phraseTokenised) {
+				bodyIntersect, titleIntersect = nil, nil
 			} else {
-				// TODO: assume the len(phase) >= 1
-				sumBodyWeight, sumTitleWeight = termWeights[0].BodyWeights[0], termWeights[0].TitleWeights[0]
-				bodyIntersect := termWeights[0].BodyWeights[1:]
-				titleIntersect := termWeights[0].TitleWeights[1:]
-
+				// ASSUMING len(phrase) >= 1
+				// int in termWeights[int] represent the term position
+				if len(termWeights[0].BodyWeights) != 0 {
+					sumBodyWeight += termWeights[0].BodyWeights[0]
+					bodyIntersect = termWeights[0].BodyWeights[1:]
+				}
+				if len(termWeights[0].TitleWeights) != 0 {
+					sumTitleWeight += termWeights[0].TitleWeights[0]
+					titleIntersect = termWeights[0].TitleWeights[1:]
+				}
+ 
 				for idx := 1; idx < len(termWeights); idx++ {
 					i := uint8(idx)
-					sumBodyWeight += termWeights[i].BodyWeights[0]
-					bodyIntersect = intersect(bodyIntersect, termWeights[i].BodyWeights[1:])
 
-					sumTitleWeight += termWeights[i].TitleWeights[0]
-					titleIntersect = intersect(titleIntersect, termWeights[i].TitleWeights[1:])
+					if len(termWeights[i].BodyWeights) == 0 {
+						bodyIntersect = nil
+					} else {
+						sumBodyWeight += termWeights[i].BodyWeights[0]
+						bodyIntersect = intersect(bodyIntersect, termWeights[i].BodyWeights[1:])
+					}
+					
+					if len(termWeights[i].TitleWeights) == 0 {
+						titleIntersect = nil
+					} else {
+						sumTitleWeight += termWeights[i].TitleWeights[0]
+						titleIntersect = intersect(titleIntersect, termWeights[i].TitleWeights[1:])
+					}
 				}
-				deleteBody, deleteTitle = len(bodyIntersect)==0, len(titleIntersect)==0
 			}
 
 			// append doc having phrase to final result
-			if !deleteBody && !deleteTitle {
+			if len(bodyIntersect) != 0 || len(titleIntersect) != 0 {
 				val := ret[docHash]
-				if !deleteBody {
+				if len(bodyIntersect) !=0 {
 					val.BodyWeights = append(val.BodyWeights, sumBodyWeight)
 				}
-				if !deleteTitle {
+				if len(titleIntersect) != 0 {
 					val.TitleWeights = append(val.TitleWeights, sumTitleWeight)
 				}
 				ret[docHash] = val
@@ -525,16 +546,18 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	query = strings.Replace(query, "-", " ", -1)	
 	log.Print("Querying terms:", query)
 	timer := time.Now()
+
 	// separate the phrase into variable phrases, and exclude them from the query
 	phrases := getPhrase(query)
 	for _, term := range phrases {
 		query = strings.Replace(query, "\""+string(term)+"\"", "", 1)
 	}
+
 	queryTokenised := parser.Laundry(strings.Join(strings.Fields(query), " "))
 	phraseTokenised := parser.Laundry(strings.Join(phrases, " "))
 
 	// convert term to docHash
-	for i := 0; i < len(phrases); i++ {
+	for i := 0; i < len(phraseTokenised); i++ {
 		tempHash := md5.Sum([]byte(phraseTokenised[i]))
 		phraseTokenised[i] = hex.EncodeToString(tempHash[:])
 	}
@@ -578,7 +601,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	
 	//---------------- COMBINED RETRIEVAL, FINAL RANK CALCULATION ----------------//
 	
-	for docHash, ranks := range <- docPhrase {
+	for docHash, ranks := range <-docPhrase {
 		val := aggregatedDocs[docHash]
 		val.TitleWeights = append(val.TitleWeights, ranks.TitleWeights...)
 		val.BodyWeights = append(val.BodyWeights, ranks.BodyWeights...)
@@ -592,7 +615,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	numFanOut = int(math.Ceil(float64(len(aggregatedDocs))* 0.75))
 	docsOutChan := [] (<-chan Rank_combined){}
 	for i := 0; i < numFanOut; i++ {
-		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)))
+		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised)))
 	}
 
 	// fan-in final rank (generator pattern) and sort the result

@@ -9,6 +9,7 @@ import (
 )
 
 type Rank_term struct {
+	// in phrase search, title and bodyweights are used for tf*idf calculation as well as retrieving the position
 	TitleWeights	[]float32
 	BodyWeights	[]float32
 	// used only for phrase search
@@ -166,6 +167,10 @@ func sortFloat32(slice []float32) []float32 {
 }
 
 func intersect(slice1, slice2 []float32) []float32 {
+	if slice1 == nil || slice2 == nil {
+		return nil
+	}
+
 	var ret []float32
 
 	// sort slice first based on sort library
