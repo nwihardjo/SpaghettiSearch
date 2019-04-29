@@ -28,7 +28,14 @@ func main() {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tr}
+	td, timeE := time.ParseDuration("15s")
+	if timeE != nil {
+		panic(timeE)
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout: td,
+	}
 
 	startURL := "https://www.cse.ust.hk"
 	numOfPages := 300
@@ -142,11 +149,9 @@ func main() {
 	/* Close the queue channel */
 	queue.Close()
 
-	/* Wait for all indexers to finish */
-	// wgIndexer.Wait()
 	fmt.Println("\nTotal visited length:", len(visited))
 	fmt.Println("\nTotal crawling and indexing time: " + time.Now().Sub(start).String())
-	
+
 	// perform database update
 	timer := time.Now()
 	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw)
