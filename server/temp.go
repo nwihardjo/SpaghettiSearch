@@ -22,7 +22,7 @@ type docResult struct {
 }
 
 type request struct {
-	query	string	`json:"query"`
+	Query	string	`json:"query"`
 }
 
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
@@ -31,9 +31,11 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 
 	var query request
-	_ = json.NewDecoder(r.Body).Decode(&query)
-	log.Print("DEBUG: Querying ", query, " ...")
-	log.Print("DEBUG: ", r.Body)
+	if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
+		panic(err)
+	}
+
+	log.Print("DEBUG: Querying ", query.Query, " ...")
 	
 	tempChild := []string{"children type","need","to","be","changed"}
 	tempParents := []string{"parent type","need","to","be","changed"}
