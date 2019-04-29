@@ -229,7 +229,7 @@ func convertHashDocinfo(ctx context.Context, docHashes []string, forw []db.DB) <
 		}
 
 		// fan-in result
-		resultUrl := make([]string, len(docHashes))
+		var resultUrl []string
 		for docUrl := range fanInUrl(docOutChan) {
 			resultUrl = append(resultUrl, docUrl)
 		}
@@ -245,7 +245,6 @@ func retrieveUrl(ctx context.Context, docHashIn <-chan string, forw []db.DB) <-c
 		for docHash := range docHashIn {
 			var url string
 			if val, err := forw[1].Get(ctx, docHash); err != nil {
-				log.Print("DEBUG DOCHASH", docHash)
 				panic(err)
 			} else {
 				doc := val.(db.DocInfo)
