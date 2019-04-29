@@ -136,11 +136,6 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 			ctx, &updateTitle, &updateBody, &updateKids)
 	}
 
-	fmt.Println("\n\n[DEBUG 7-0] updateTitle:", updateTitle, "\n\n")
-	fmt.Println("\n\n[DEBUG 7-0] updateBody:", updateBody, "\n\n")
-	fmt.Println("\n\n[DEBUG 7-0] updateKids:", updateKids, "\n\n")
-	fmt.Println("\n\n[DEBUG 7-3] ", dI, "\n\n")
-
 	// If the doc exists and there is no changes, return
 	if checkIndex && !updateTitle && !updateBody && !updateKids {
 		fmt.Println("\n\n[DEBUG] Checked, no update\n\n")
@@ -467,8 +462,6 @@ func checkAndUpdate(dI *database.DocInfo, pageTitle, kids []string, lock2 *sync.
 						wHashString := hex.EncodeToString(wHash[:])
 						dpw_, e := inverted[0].Get(ctx, wHashString)
 						if e != nil {
-							fmt.Println("ERROR: ", w)
-							fmt.Println("ERROR: ", wHashString)
 							panic(e)
 						}
 						dpw, ok := dpw_.(map[string][]float32)
@@ -519,8 +512,6 @@ func checkAndUpdate(dI *database.DocInfo, pageTitle, kids []string, lock2 *sync.
 						wHashString := hex.EncodeToString(wHash[:])
 						dpw_, e := inverted[0].Get(ctx, wHashString)
 						if e != nil {
-							fmt.Println("ERROR: ", w)
-							fmt.Println("ERROR: ", wHashString)
 							panic(e)
 						}
 						dpw, ok := dpw_.(map[string][]float32)
