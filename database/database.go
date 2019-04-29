@@ -78,7 +78,6 @@ type (
 	}
 )
 
-
 type (
 	BatchWriter interface {
 		// initialise batch writer, set and collect the key-value pairs to be written in batch
