@@ -30,6 +30,7 @@ type Rank_combined struct {
 	Children      []string          `json:"Children"`
 	Parents       []string          `json:"Parents"`
 	Words_mapping map[string]uint32 `json:"Words_mapping"`
+	Summary	      string		`json:"Summary"`
 	PageRank      float64           `json:"PageRank"`
 	FinalRank     float64           `json:"FinalRank"`
 }
@@ -52,7 +53,7 @@ func appendSort(data []Rank_combined, el Rank_combined) []Rank_combined {
 	return data
 }
 
-func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combined {
+func resultFormat(metadata db.DocInfo, PR float64, finalRank float64, summary string) Rank_combined {
 	// only get first 5 children and parents
 	var parentList, childList []string
 	if len(metadata.Parents) == 0 {
@@ -103,6 +104,7 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64) Rank_combi
 		Children:      childList,
 		Parents:       parentList,
 		Words_mapping: sortMap(metadata.Words_mapping),
+		Summary:       summary,
 		PageRank:      PR,
 		FinalRank:     finalRank,
 	}
