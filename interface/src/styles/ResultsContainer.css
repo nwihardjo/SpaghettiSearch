@@ -16,6 +16,7 @@
 .header.navbar.navbar-light.bg-faded {
   border-bottom: 0.5px solid rgba(0,0,0,0.2);
   padding: 1.5rem 2rem;
+  background-color: white;
   /* border-color: #2F80ED; */
 }
 
