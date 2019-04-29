@@ -96,7 +96,13 @@ func Crawl(sem *semaphore.Weighted, parentURL string,
 	defer sem.Release(1)
 
 	innerStart := time.Now()
-	resp, err := client.Get(currentURL)
+	req, e := http.NewRequest("GET", currentURL, nil)
+	if e != nil {
+		panic(e)
+	}
+	req.Header.Add("Accept", "text/html, application/xhtml+xml, application/xml;q=0.9, image/webp, */*;q=0.8")
+	req.Header.Add("Accept-Language", "en")
+	resp, err := client.Do(req)
 	fmt.Println("Visited " + currentURL + " (elapsed time: " + time.Now().Sub(innerStart).String() + ")")
 
 	if err != nil {
@@ -144,7 +150,7 @@ func Crawl(sem *semaphore.Weighted, parentURL string,
 	}
 
 	mutex.Lock()
-	indexer.Index(htmlData, currentURL, lock2, lm, ps, mutex, inv, forw, parentURL, childsArr)
+	indexer.Index(htmlData, doc, currentURL, lock2, lm, ps, mutex, inv, forw, parentURL, childsArr)
 	mutex.Unlock()
 
 	resp.Body.Close()

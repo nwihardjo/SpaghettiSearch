@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/dgraph-io/badger"
+	"golang.org/x/net/html"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -20,7 +21,7 @@ import (
 
 var DocsDir = "docs/"
 
-func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
+func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMutex,
 	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB, forward []database.DB,
 	parentURL string, children []string) {
@@ -73,7 +74,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	//mutex.Unlock()
 
 	// title and body are structs
-	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(doc, urlString)
+	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(rootNode, urlString)
 
 	// Parse title & page size
 	pageTitle := strings.Fields(titleInfo.Content)
