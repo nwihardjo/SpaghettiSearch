@@ -19,10 +19,6 @@ var forw []db.DB
 var inv []db.DB
 var ctx context.Context
 
-type request struct {
-	Query string `json:"query"`
-}
-
 func setHeader(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -31,58 +27,23 @@ func setHeader(w http.ResponseWriter) {
 
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	setHeader(w)
-	if r.Method == "OPTIONS" {
-		return
-	}
-	log.Print(r.Body)
+	//---------------- QUERY PARSING ----------------//
 
-	if r.Method == "POST" {
-		var query request
-		if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
-			panic(err)
-		}
+	params := mux.Vars(r)
+	query := params["terms"]
+	// if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
+	// 	panic(err)
+	// }
 
-		log.Print("Querying terms:", query)
+	query = strings.Replace(query, "-", " ", -1)
+	log.Print("Querying terms:", query)
+	timer := time.Now()
 
-		timer := time.Now()
-		result := retrieval.Retrieve(query, ctx, forw, inv)
-		json.NewEncoder(w).Encode(result)
+	result := retrieval.Retrieve(query, ctx, forw, inv)
 
-		log.Print("Query processed in ", time.Since(timer))
-	}
-}
+	json.NewEncoder(w).Encode(result)
 
-func GetWordList(w http.ResponseWriter, r *http.Request) {
-	log.Print("Getting word list...")
-
-	pre := mux.Vars(r)["pre"]
-
-	setHeader(w)
-
-	tempT, err := inv[0].IterateInv(ctx, pre, forw[0])
-	if err != nil {
-		panic(err)
-	}
-	tempB, err := inv[1].IterateInv(ctx, pre, forw[0])
-	if err != nil {
-		panic(err)
-	}
-	merged_ := make(map[string]bool)
-	for _, i := range tempT {
-		merged_[i] = true
-	}
-	for _, i := range tempB {
-		merged_[i] = true
-	}
-	tempT = []string{}
-	tempB = []string{}
-	var merged []string
-	for k, _ := range merged_ {
-		merged = append(merged, k)
-		delete(merged_, k)
-	}
-	sort.Sort(sort.StringSlice(merged))
-	json.NewEncoder(w).Encode(merged)
+	log.Print("Query processed in ", time.Since(timer))
 }
 
 func main() {
