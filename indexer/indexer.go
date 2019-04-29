@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/dgraph-io/badger"
+	"golang.org/x/net/html"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -20,7 +21,7 @@ import (
 
 var DocsDir = "docs/"
 
-func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
+func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMutex,
 	lastModified time.Time, ps string, mutex *sync.Mutex,
 	inverted []database.DB, forward []database.DB,
 	parentURL string, children []string) {
@@ -70,10 +71,10 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 	} else {
 		panic(err)
 	}
-	//mutex.Unlock()
+	// mutex.Unlock()
 
 	// title and body are structs
-	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(doc, urlString)
+	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(rootNode, urlString)
 
 	// Parse title & page size
 	pageTitle := strings.Fields(titleInfo.Content)
@@ -128,6 +129,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 		kidUrls = append(kidUrls, childURL)
 	}
 
+	// mutex.Lock()
 	// If the doc exists, check its title, body, children, and page size
 	// If any of them modified, update / delete accordingly
 	if checkIndex {
@@ -135,6 +137,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 			bwInv, bwFrw, wordMapping, pageSize, inverted, forward,
 			ctx, &updateTitle, &updateBody, &updateKids)
 	}
+	// mutex.Unlock()
 
 	// If the doc exists and there is no changes, return
 	if checkIndex && !updateTitle && !updateBody && !updateKids {
@@ -159,7 +162,7 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 
 	// START OF CRITICAL SECTION //
 	// LOCK //
-	//mutex.Lock()
+	// mutex.Lock()
 
 	//lock2.RLock()
 	// if current doc is not found or if the new title is different from the old one,
@@ -217,9 +220,6 @@ func Index(doc []byte, urlString string, lock2 *sync.RWMutex,
 				if cleanFancy[kid] == nil {
 					tempP[docHashString] = []string{}
 				} else {
-					// for _, w := range cleanFancy[kid] {
-					// 	tempP[docHashString] = tempW
-					// }
 					tempP[docHashString] = cleanFancy[kid]
 				}
 				docInfoC = database.DocInfo{*kidUrls[idx], nil, time.Time{}, 0, nil, tempP, nil}

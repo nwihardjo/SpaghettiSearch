@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/surgebase/porter2"
@@ -19,7 +18,7 @@ type Term struct {
 	Pos     map[string][]float32
 }
 
-func Parse(doc []byte, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
+func Parse(doc *html.Node, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
 	title, words, meta, fancy, fancyURLs := tokenize(doc, baseURL)
 	// Clean terms in title and body
 	cleanTitle := Laundry(title)
@@ -46,13 +45,13 @@ func Parse(doc []byte, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo
 	return
 }
 
-func tokenize(doc []byte, baseURL string) (title string,
+func tokenize(doc *html.Node, baseURL string) (title string,
 	words, meta, fancy, fancyURLs []string) {
 
-	doc_, err := html.Parse(bytes.NewReader(doc))
-	if err != nil {
-		panic(err)
-	}
+	// doc_, err := html.Parse(bytes.NewReader(doc))
+	// if err != nil {
+	// 	panic(err)
+	// }
 	var f func(*html.Node, string)
 	f = func(n *html.Node, baseURL string) {
 		if n.Type == html.ElementNode {
@@ -100,6 +99,20 @@ func tokenize(doc []byte, baseURL string) (title string,
 							} else {
 								thisURL = attr.Val
 							}
+
+							/* Ignore media files */
+							isMedia := false
+							mediaExs := []string{".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi"}
+							for _, ex := range mediaExs {
+								if strings.HasSuffix(thisURL, ex) {
+									isMedia = true
+									break
+								}
+							}
+							if isMedia {
+								continue
+							}
+
 							if len(thisURL) == 0 {
 								break
 							}
@@ -117,7 +130,6 @@ func tokenize(doc []byte, baseURL string) (title string,
 							}
 							fancyURLs = append(fancyURLs, tail)
 							fancy = append(fancy, cleaned)
-							// fmt.Println(tail, cleaned)
 						}
 						break
 					}
@@ -129,7 +141,7 @@ func tokenize(doc []byte, baseURL string) (title string,
 			f(c, baseURL)
 		}
 	}
-	f(doc_, baseURL)
+	f(doc, baseURL)
 
 	return
 }
