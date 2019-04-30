@@ -1,0 +1,9 @@
+.word {
+  border-radius: .5rem;
+  border: 1px solid rgba(0,0,0,.1);
+  padding: 3px 10px 3px 10px;
+  text-align: center;
+  font-size: .75rem;
+  margin-right: 3px;
+  margin-bottom: 3px;
+}

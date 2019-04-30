@@ -1,28 +1,20 @@
-import React, { Component } from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import Main from "./containers/Main";
+import ResultsContainer from "./containers/ResultsContainer";
+import WordList from "./containers/WordList";
+import { BrowserRouter as Router, Route, Link, Switch, withRouter } from "react-router-dom";
+import history from './utils/history';
 
-class App extends Component {
-  render() {
-    return (
-      <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-        </header>
-      </div>
-    );
-  }
+function App() {
+  return (
+    <Router history={history}>
+    <Switch>
+        <Route path="/" exact component={withRouter(Main)}/>
+        <Route path="/query" exact component={withRouter(ResultsContainer)} />
+        <Route path="/word-list" component={withRouter(WordList)} />
+        </Switch>
+    </Router>
+  );
 }
 
 export default App;

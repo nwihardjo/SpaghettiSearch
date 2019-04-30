@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
-	"sort"
 	"strings"
 	db "the-SearchEngine/database"
 	"the-SearchEngine/retrieval"
@@ -67,6 +66,5 @@ func main() {
 	router := mux.NewRouter()
 	log.Print("Server is running")
 	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
-	router.HandleFunc("/wordlist/{pre}", GetWordList).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
