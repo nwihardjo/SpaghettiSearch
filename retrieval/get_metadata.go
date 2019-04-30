@@ -77,9 +77,7 @@ func getSummary(docHash string)  <-chan string{
 				tempD := n.Parent.Data
 				cleaned := strings.TrimSpace(n.Data)
 				if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
-					if tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav"{
-						words = append(words, cleaned)
-					}
+					words = append(words, cleaned)
 				}
 			}
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
