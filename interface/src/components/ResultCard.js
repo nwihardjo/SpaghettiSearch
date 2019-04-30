@@ -99,6 +99,7 @@ class ResultCard extends Component {
         </CardBody>
       </Card>
       </a>
+
     );
   }
 }

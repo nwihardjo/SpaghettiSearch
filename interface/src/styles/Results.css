@@ -1,9 +1,9 @@
 .results {
   padding: 20px 20px 20px 20px;
-  position: element(#searchbar);
+  /* position: element(#searchbar); */
   left: 0;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  flex-direction: row;
+  /* align-items: flex-start; */
+  /* flex-direction: row; */
 }

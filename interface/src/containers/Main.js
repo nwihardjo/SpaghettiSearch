@@ -34,9 +34,9 @@ class Main extends Component {
           <Form onSubmit={this.handleSearch}>
             <Input type="search" className="searchbox--main" placeholder="What would you like to search?"  bsSize="lg" onChange={this.handleChange} />
           </Form><br/>
-          <small className="text-muted">
+          <div className='align-right'><small className="text-muted">
             OR TRY <a href='/word-list'><Button outline color="primary">Keyword Search</Button></a>
-          </small></div>
+          </small></div></div>
         </div>
       );
     }

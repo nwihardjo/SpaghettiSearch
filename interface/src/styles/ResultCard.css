@@ -13,6 +13,7 @@
   margin-top: 0.5rem;
 }
 .custom.card {
+  flex: 1 auto;
   margin: 5px 5px 5px 5px;
   max-width: 400px;
 }
