@@ -42,8 +42,9 @@ class ResultCard extends Component {
           <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}</small>
           <CardSubtitle> {this.state.Url} </CardSubtitle>
           <div className='row'>
-          {Object.keys(this.state.Words_mapping).map((word, freq) => {
-            return(<Keywords word={word} freq={freq} />)
+          {Object.entries(this.state.Words_mapping).sort((a, b) => {
+						return b[1] - a[1] }).map((entry) => {
+            return(<Keywords word={entry[0]} freq={entry[1]} />)
           })}</div>
         </CardBody>
         <CardBody>

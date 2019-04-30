@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Button, Container, Row, Col, Pagination, PaginationItem, PaginationLink } from 'reactstrap';
 import history from '../utils/history'
 const axios = require('axios');
+const config = require('../config/server');
 
 class WordList extends Component {
   constructor() {
@@ -20,7 +21,7 @@ class WordList extends Component {
 
   componentDidMount(props) {
 		let currO = this;
-    axios.get('http://localhost:8080/wordlist/a').then(function(res) {
+    axios.get(config.address+'wordlist/a').then(function(res) {
 			let temp = []
 			for(let i in res.data) {
 				if(i >= currO.state.maxRow * currO.state.maxCol) break;
@@ -41,7 +42,7 @@ class WordList extends Component {
 
 	updateCurrData(pre) {
 		let currO = this;
-    axios.get('http://localhost:8080/wordlist/' + pre.toLowerCase()).then(function(res) {
+    axios.get(config.address+'wordlist/' + pre.toLowerCase()).then(function(res) {
 			let temp = []
 			for(let i in res.data) {
 				if(i >= currO.state.maxRow * currO.state.maxCol) break;

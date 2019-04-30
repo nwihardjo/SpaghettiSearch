@@ -41,7 +41,7 @@ func main() {
 	numOfPages := 300
 	maxThreadNum := 100
 	sem := semaphore.NewWeighted(int64(maxThreadNum))
-	domain := "ust.hk"
+	domain := "cse.ust.hk"
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
 	errorsChannel := channels.NewInfiniteChannel()
