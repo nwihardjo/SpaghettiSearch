@@ -44,7 +44,6 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	log.Print("result is ", len(result))
 
 	json.NewEncoder(w).Encode(result)
-	log.Print(result)
 	log.Print("Query processed in ", time.Since(timer))
 }
 

@@ -3,14 +3,14 @@ package retrieval
 import (
 	"context"
 	"math"
-	//"bytes"
+"bytes"
 	"sync"
-//	"io/ioutil"
+	"io/ioutil"
 	db "the-SearchEngine/database"
 	"log"
-	//"strings"
-	//"golang.org/x/net/html"
-//	"the-SearchEngine/indexer"
+"strings"
+"golang.org/x/net/html"
+	"the-SearchEngine/indexer"
 )
 
 func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int) <-chan Rank_combined {
@@ -40,15 +40,25 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			// compute final rank
 			queryMagnitude := math.Sqrt(float64(queryLength))
 
+			docMetaData := <-metadata
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
 
-			// retrieve result from future, assign ranking
-			docMetaData := <-metadata
 			docMetaData.PageRank = PR
 			docMetaData.FinalRank = 0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank
 			docMetaData.Summary = <-summary
-			log.Print(docMetaData.Summary)
+
+			if math.IsNaN(doc.TitleRank) || math.IsNaN(doc.BodyRank) || math.IsNaN(PR) {
+				log.Print("MAJOR DEBUG ", doc.TitleRank, doc.BodyRank, PR)
+			}
+				
+			// retrieve result from future, assign ranking
+			if math.IsNaN(docMetaData.PageRank) {
+				docMetaData.PageRank = 0
+			} 
+			if math.IsNaN(docMetaData.FinalRank) {
+				docMetaData.FinalRank = 0
+			}
 
 			out <- docMetaData
 		}
@@ -58,17 +68,13 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 }
 
 func getSummary(docHash string)  <-chan string{
-	out := make(chan string)
-	defer close(out)
+	out := make(chan string, 1)
 	go func() {
 		// read cached files
-		//htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
-		if true {
-			log.Print("beenheredonethat")
-			temp := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa"
-			out <- temp
+		htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
+		if err != nil  {
+			out <- ""
 		} else {
-/*
 			doc, err := html.Parse(bytes.NewReader(htmResp))
 			if err != nil {
 				panic(err)
@@ -105,8 +111,6 @@ func getSummary(docHash string)  <-chan string{
 				words = append(words, "...")
 				out <- strings.Join(words, " ")
 			}
-			log.Print("out")
-*/
 		}
 	}()
 	return out
