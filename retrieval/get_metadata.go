@@ -47,7 +47,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			if math.IsNaN(doc.BodyRank) {
 				doc.BodyRank = 0
 			}
-			if math.IsNan(doc.TitleRank) {
+			if math.IsNaN(doc.TitleRank) {
 				doc.TitleRank = 0
 			}
 			if math.IsNaN(PR) {
