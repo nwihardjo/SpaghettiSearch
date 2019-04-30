@@ -452,7 +452,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string,
 			}
 			docInfoC_.Parents[docHashString] = cleanFancy[kid]
 			// Set docHash of child -> docInfo of child using batch writer
-			if err = bw_child.BatchSet(ctx, kid, docInfoC); err != nil {
+			if err = bw_child.BatchSet(ctx, kid, docInfoC_); err != nil {
 				panic(err)
 			}
 			tttt := make(map[string]uint32)
