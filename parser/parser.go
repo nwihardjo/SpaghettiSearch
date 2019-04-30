@@ -1,11 +1,13 @@
 package parser
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/surgebase/porter2"
 	"golang.org/x/net/html"
 	"io/ioutil"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -18,7 +20,7 @@ type Term struct {
 	Pos     map[string][]float32
 }
 
-func Parse(doc *html.Node, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
+func Parse(doc /**html.Node*/[]byte, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
 	title, words, meta, fancy, fancyURLs := tokenize(doc, baseURL)
 	// Clean terms in title and body
 	cleanTitle := Laundry(title)
@@ -28,7 +30,7 @@ func Parse(doc *html.Node, baseURL string) (titleInfo Term, bodyInfo Term, fancy
 	for i, f := range fancy {
 		urlHash := md5.Sum([]byte(fancyURLs[i]))
 		urlHashString := hex.EncodeToString(urlHash[:])
-		cleanFancy[urlHashString] = append(cleanFancy[fancyURLs[i]], Laundry(f)...)
+		cleanFancy[urlHashString] = append(cleanFancy[urlHashString], Laundry(f)...)
 	}
 
 	// Get frequency and positions of each term
@@ -45,13 +47,13 @@ func Parse(doc *html.Node, baseURL string) (titleInfo Term, bodyInfo Term, fancy
 	return
 }
 
-func tokenize(doc *html.Node, baseURL string) (title string,
+func tokenize(doc []byte/**html.Node*/, baseURL string) (title string,
 	words, meta, fancy, fancyURLs []string) {
 
-	// doc_, err := html.Parse(bytes.NewReader(doc))
-	// if err != nil {
-	// 	panic(err)
-	// }
+	doc_, err := html.Parse(bytes.NewReader(doc))
+	if err != nil {
+		panic(err)
+	}
 	var f func(*html.Node, string)
 	f = func(n *html.Node, baseURL string) {
 		if n.Type == html.ElementNode {
@@ -120,10 +122,17 @@ func tokenize(doc *html.Node, baseURL string) (title string,
 							var tail string
 							if len(thisURL) < 4 ||
 								(thisURL[:4] != "http" && thisURL[:4] != "www.") {
+								baseURLtype, e := url.Parse(baseURL)
+								if e != nil {
+									panic(e)
+								}
+								hn := baseURLtype.Hostname()
+								sc := baseURLtype.Scheme
+
 								if thisURL[0] != '/' {
 									tail = urlRe.ReplaceAllString(baseURL+"/"+thisURL, "")
 								} else {
-									tail = urlRe.ReplaceAllString(baseURL+thisURL, "")
+									tail = urlRe.ReplaceAllString(sc+"://"+hn+thisURL, "")
 								}
 							} else {
 								tail = urlRe.ReplaceAllString(thisURL, "")
@@ -141,7 +150,7 @@ func tokenize(doc *html.Node, baseURL string) (title string,
 			f(c, baseURL)
 		}
 	}
-	f(doc, baseURL)
+	f(doc_, baseURL)
 
 	return
 }
