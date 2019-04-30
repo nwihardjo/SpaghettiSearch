@@ -38,7 +38,7 @@ func main() {
 	}
 
 	startURL := "https://www.cse.ust.hk"
-	numOfPages := 300
+	numOfPages := 1500
 	maxThreadNum := 100
 	sem := semaphore.NewWeighted(int64(maxThreadNum))
 	domain := "cse.ust.hk"
@@ -152,12 +152,14 @@ func main() {
 	fmt.Println("\nTotal visited length:", len(visited))
 	fmt.Println("\nTotal crawling and indexing time: " + time.Now().Sub(start).String())
 
+	//inv[1].Debug_Print(ctx)
 	// perform database update
 	timer := time.Now()
 	ranking.UpdatePagerank(ctx, 0.85, 0.000001, forw)
 	ranking.UpdateTermWeights(ctx, &inv[0], &forw[4], "title")
 	ranking.UpdateTermWeights(ctx, &inv[1], &forw[4], "body")
 
+	//inv[1].Debug_Print(ctx)
 	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
 	fmt.Println("\nTotal elapsed time: " ,time.Now().Sub(start).String())
 }

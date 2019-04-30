@@ -3,13 +3,13 @@ package retrieval
 import (
 	"context"
 	"math"
-"bytes"
+	"bytes"
 	"sync"
 	"io/ioutil"
 	db "the-SearchEngine/database"
 	"log"
-"strings"
-"golang.org/x/net/html"
+	"strings"
+	"golang.org/x/net/html"
 	"the-SearchEngine/indexer"
 )
 
@@ -17,6 +17,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 	out := make(chan Rank_combined)
 	go func() {
 		for doc := range docs {
+			log.Print(doc)
 			// get doc metadata using future pattern for faster performance
 			metadata := getDocInfo(ctx, doc.DocHash, forw)
 			summary := getSummary(doc.DocHash)
@@ -43,22 +44,19 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			docMetaData := <-metadata
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
+			if math.IsNaN(doc.BodyRank) {
+				doc.BodyRank = 0
+			}
+			if math.IsNan(doc.TitleRank) {
+				doc.TitleRank = 0
+			}
+			if math.IsNaN(PR) {
+				PR = 0
+			}
 
 			docMetaData.PageRank = PR
 			docMetaData.FinalRank = 0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank
 			docMetaData.Summary = <-summary
-
-			if math.IsNaN(doc.TitleRank) || math.IsNaN(doc.BodyRank) || math.IsNaN(PR) {
-				log.Print("MAJOR DEBUG ", doc.TitleRank, doc.BodyRank, PR)
-			}
-				
-			// retrieve result from future, assign ranking
-			if math.IsNaN(docMetaData.PageRank) {
-				docMetaData.PageRank = 0
-			} 
-			if math.IsNaN(docMetaData.FinalRank) {
-				docMetaData.FinalRank = 0
-			}
 
 			out <- docMetaData
 		}

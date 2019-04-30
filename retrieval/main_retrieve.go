@@ -97,13 +97,11 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 		for i := 0; i < 50; i++ {
 			finalResult[i].FinalRank /= (finalResult[0].FinalRank)
 		}
-		log.Print("res")
 		return finalResult[:50]
 	} else {
 		for i := 0; i < len(finalResult); i++ {
 			finalResult[i].FinalRank /= (finalResult[0].FinalRank)
 		}
-		log.Print("ret")
 		return finalResult
 	}
 }
