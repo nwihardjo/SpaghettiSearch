@@ -1,0 +1,15 @@
+.alphabet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.alphabet button {
+  max-width: 100px;
+  margin-right: 10px;
+}
+
+.btn-secondary.disabled, .btn-secondary:disabled {
+  margin-top: .5rem;
+}

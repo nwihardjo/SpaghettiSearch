@@ -11,7 +11,7 @@
 }
 .searchbox--main.form-control{
   width: 40vw;
-  min-width: 200px;
+  min-width: 300px;
   border-radius: 30px;
   font-size:1rem;
 }
@@ -27,3 +27,22 @@
   border-color: #101010;
   border-width: 3px;
 } */
+
+.App .btn-outline-primary {
+  margin-left: 10px;
+  background-color: rgba(86, 204, 242, 0.05);
+  border-color: rgba(86, 204, 242, 1);
+  color: rgba(86, 204, 242, 1);
+  font-size: 0.8rem;
+}
+.App .btn-outline-primary:hover {
+  background-color: rgba(86, 204, 242, 0.15);
+  border-color: rgba(86, 204, 242, 1);
+  color: rgba(86, 204, 242, 1);
+  box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.07);
+}
+.App .btn-outline-primary:active:focus {
+  background-color: rgba(86, 204, 242, 0.15);
+  border-color: rgba(86, 204, 242, 1);
+  color: rgba(86, 204, 242, 1);
+}
