@@ -101,8 +101,9 @@ func (u *DocInfo) UnmarshalJSON(j []byte) error {
 			u.Parents = make(map[string][]string)
 			for k_, v_ := range v.(map[string]interface{}) {
 				if v_ != nil {
-					for _, v2 := range v_.([]interface{}) {
-						u.Parents[k_] = append(u.Parents[k_], v2.(string))
+					u.Parents[k_] = make([]string, len(v_.([]interface{})))
+					for k2, v2 := range v_.([]interface{}) {
+						u.Parents[k_][k2] = v2.(string)
 					}
 				} else {
 					u.Parents[k_] = []string{}
