@@ -1,3 +1,11 @@
+.card-link--nostyle:link{
+  text-decoration: none;
+  color: black;
+}
+.card-link--nostyle:visited{
+  text-decoration: none;
+  color: black;
+}
 .row {
   display: flex;
   justify-content: flex-start;
@@ -7,6 +15,12 @@
 .custom.card {
   margin: 5px 5px 5px 5px;
   max-width: 400px;
+}
+.custom.card:hover {
+  /* box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.07); */
+  box-shadow: 2px 3px rgba(0,0,0,0.7);
+  border-color: rgba(0,0,0,0.7);
+  border-width: 1px;
 }
 .custom.card > .card-body > .title.card-link {
   font-size: 1.2rem;

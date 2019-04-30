@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { Button, Container, Row, Col, Pagination, PaginationItem, PaginationLink } from 'reactstrap';
 import history from '../utils/history'
+import '../styles/WordList.css'
 const axios = require('axios');
 
 class WordList extends Component {
@@ -143,36 +144,26 @@ class WordList extends Component {
 
   render() {
 		const preList = [
-			"ABCDEFGHIJKL",
-			"MNOPQRSTUVWX",
-			"YZ0123456789"
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		];
 		let items = [];
-		for(let idx in preList) {
-			items.push([]);
-			for(let i in preList[idx]) {
-				items[idx].push(
-					<Col key={i}>
-						<Button block color={this.state.currPre === preList[idx][i] ? "secondary" : "info"}
-						disabled={this.state.currPre === preList[idx][i]}
-						onClick={this.updateCurrData.bind(this, preList[idx][i])}>
-							{preList[idx][i]}
+			for(let i in preList[0]) {
+				items.push(
+						<Button key={i} block color={this.state.currPre === preList[0][i] ? "secondary" : "info"}
+						disabled={this.state.currPre === preList[0][i]}
+						onClick={this.updateCurrData.bind(this, preList[0][i])}>
+							{preList[0][i]}
 						</Button>
-					</Col>
 				);
 			}
-		}
 
     return (
 			<div className="WordList">
 				<br/>
 				<br/>
-			  <Container>
-			    <Row>{items[0]}</Row>
-					<br />
-			    <Row>{items[1]}</Row>
-					<br />
-			    <Row>{items[2]}</Row>
+        <div className='alphabet'>
+			    {items}
+        </div>
 
 					<br/>
 					<br/>
@@ -180,6 +171,7 @@ class WordList extends Component {
 			    {this.getCurrPageArr()}
 					<br/>
 					<br/>
+          <Container>
 					<Row>
 						<Col>Selected Terms: <br/>{"[" + this.state.termList.join(", ") + "]"}</Col>
 						<Col>

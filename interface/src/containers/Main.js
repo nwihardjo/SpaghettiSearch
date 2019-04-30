@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import ResultsContainer from './ResultsContainer';
 import '../styles/Main.css';
-import { Form, Input } from 'reactstrap';
+import { Form, Input, Button } from 'reactstrap';
 
 class Main extends Component {
   constructor () {
@@ -35,7 +35,7 @@ class Main extends Component {
             <Input type="search" className="searchbox--main" placeholder="What would you like to search?"  bsSize="lg" onChange={this.handleChange} />
           </Form><br/>
           <small className="text-muted">
-            OR TRY <a href='/word-list'>SEARCHING BY WORDS</a>
+            OR TRY <a href='/word-list'><Button outline color="primary">Keyword Search</Button></a>
           </small></div>
         </div>
       );
