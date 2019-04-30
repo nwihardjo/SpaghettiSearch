@@ -7,6 +7,7 @@ import (
 	"sync"
 	"io/ioutil"
 	db "the-SearchEngine/database"
+	"log"
 	"strings"
 	"golang.org/x/net/html"
 	"the-SearchEngine/indexer"
@@ -16,6 +17,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 	out := make(chan Rank_combined)
 	go func() {
 		for doc := range docs {
+			log.Print(doc)
 			// get doc metadata using future pattern for faster performance
 			metadata := getDocInfo(ctx, doc.DocHash, forw)
 			summary := getSummary(doc.DocHash)
@@ -39,11 +41,19 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			// compute final rank
 			queryMagnitude := math.Sqrt(float64(queryLength))
 
+			docMetaData := <-metadata
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
+			if math.IsNaN(doc.BodyRank) {
+				doc.BodyRank = 0
+			}
+			if math.IsNan(doc.TitleRank) {
+				doc.TitleRank = 0
+			}
+			if math.IsNaN(PR) {
+				PR = 0
+			}
 
-			// retrieve result from future, assign ranking
-			docMetaData := <-metadata
 			docMetaData.PageRank = PR
 			docMetaData.FinalRank = 0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank
 			docMetaData.Summary = <-summary
@@ -57,48 +67,48 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 
 func getSummary(docHash string)  <-chan string{
 	out := make(chan string, 1)
-
 	go func() {
 		// read cached files
 		htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
-		if err != nil {
-			panic(err)
-		}
-		doc, err := html.Parse(bytes.NewReader(htmResp))
-		if err != nil {
-			panic(err)
-		}
-		
-		// extract text from html body
-		var words []string
-		var extractWord func(*html.Node)
-		extractWord = func(n *html.Node) {
-			if n.Type == html.TextNode{
-				tempD := n.Parent.Data
-				cleaned := strings.TrimSpace(n.Data)
-				if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
-					words = append(words, cleaned)
+		if err != nil  {
+			out <- ""
+		} else {
+			doc, err := html.Parse(bytes.NewReader(htmResp))
+			if err != nil {
+				panic(err)
+			}
+			
+			// extract text from html body
+			var words []string
+			var extractWord func(*html.Node)
+			extractWord = func(n *html.Node) {
+				if n.Type == html.TextNode{
+					tempD := n.Parent.Data
+					cleaned := strings.TrimSpace(n.Data)
+					if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
+						words = append(words, cleaned)
+					}
+				}
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					extractWord(c)
 				}
 			}
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				extractWord(c)
+			extractWord(doc)
+			
+			// pre-process words extracted
+			words = strings.Fields(strings.Join(words, " "))
+			
+			if len(words) > 21 {
+				var temp []string
+				i := int(math.Ceil(float64(len(words)) / 2.0))
+				temp = append(temp, "...")
+				temp = append(temp, words[i-10:i+11]...)
+				temp = append(temp, "...")
+				out <- strings.Join(temp, " ")
+			} else {
+				words = append(words, "...")
+				out <- strings.Join(words, " ")
 			}
-		}
-		extractWord(doc)
-		
-		// pre-process words extracted
-		words = strings.Fields(strings.Join(words, " "))
-		
-		if len(words) > 21 {
-			var temp []string
-			i := int(math.Ceil(float64(len(words)) / 2.0))
-			temp = append(temp, "...")
-			temp = append(temp, words[i-10:i+11]...)
-			temp = append(temp, "...")
-			out <- strings.Join(temp, " ")
-		} else {
-			words = append(words, "...")
-			out <- strings.Join(words, " ")
 		}
 	}()
 	return out

@@ -10,6 +10,7 @@ import (
 	"sync"
 	db "the-SearchEngine/database"
 	"the-SearchEngine/parser"
+	"log"
 )
 
 func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Rank_combined {
@@ -86,9 +87,11 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 
 	// fan-in final rank (generator pattern) and sort the result
 	finalResult := make([]Rank_combined, 0, len(aggregatedDocs))
+	log.Print(len(aggregatedDocs))
 	for docRank := range fanInResult(docsOutChan) {
 		finalResult = appendSort(finalResult, docRank)
 	}
+	log.Print("fin ", len(finalResult))
 
 	if len(finalResult) > 50 {
 		for i := 0; i < 50; i++ {
