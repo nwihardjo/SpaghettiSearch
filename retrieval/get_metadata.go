@@ -45,7 +45,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			// retrieve result from future, assign ranking
 			docMetaData := <-metadata
 			docMetaData.PageRank = PR
-			docMetaData.FinalRank = 0.4*PR + 0.4*doc.TitleRank + 0.2*doc.BodyRank
+			docMetaData.FinalRank = 0.25*PR + 0.45*doc.TitleRank + 0.3*doc.BodyRank
 			docMetaData.Summary = <-summary
 
 			out <- docMetaData
@@ -76,7 +76,7 @@ func getSummary(docHash string)  <-chan string{
 			if n.Type == html.TextNode{
 				tempD := n.Parent.Data
 				cleaned := strings.TrimSpace(n.Data)
-				if tempD != "title" && tempD != "script" && tempD != "style" && cleaned != "" {
+				if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
 					if tempD == "a" {
 						for _, attr := range n.Parent.Attr {
 							if attr.Key == "href" {
@@ -114,9 +114,11 @@ func getSummary(docHash string)  <-chan string{
 		// pre-process words extracted
 		words = strings.Fields(strings.Join(words, " "))
 		
-		if len(words) > 20 {
+		if len(words) > 21 {
 			var temp []string
-			temp = append(temp, words[:20]...)
+			i := int(math.Ceil(float64(len(words)) / 2.0))
+			temp = append(temp, "...")
+			temp = append(temp, words[i-10:i+11]...)
 			temp = append(temp, "...")
 			out <- strings.Join(temp, " ")
 		} else {
