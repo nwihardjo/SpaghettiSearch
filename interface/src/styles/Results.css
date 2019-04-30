@@ -4,4 +4,6 @@
   left: 0;
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  flex-direction: row;
 }

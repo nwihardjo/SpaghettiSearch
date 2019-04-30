@@ -14,7 +14,9 @@ class Results extends Component {
     this.setState({query: this.props.query});
     this.getResults(this.props.query);
   }
+
   getResults = (query) => {
+    this.setState({results: []});
     console.log("Results received query: ", query)
     axios({
       method: 'post',
@@ -28,7 +30,10 @@ class Results extends Component {
     })
     .then((response) => {
       console.log(response.data);
-      this.setState({query: query, results: response.data});
+      var filtered = response.data.filter(function (el) {
+        return el.Url != "";
+      })
+      this.setState({query: query, results: filtered});
     })
     .catch((error) => {
       console.log(error);

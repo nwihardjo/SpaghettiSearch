@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { Button, Container, Row, Col, Pagination, PaginationItem, PaginationLink } from 'reactstrap';
+import history from '../utils/history'
 const axios = require('axios');
 
 class WordList extends Component {
@@ -27,6 +28,15 @@ class WordList extends Component {
 			}
       currO.setState({ data: res.data, currPageD: temp });
     });
+  }
+
+  handleSubmit = () => {
+    console.log(this.state.termList.join(" "))
+    history.push(
+      '/query',
+      {query: this.state.termList.join(" ")}
+    );
+    document.location.reload(true)
   }
 
 	updateCurrData(pre) {
@@ -173,7 +183,7 @@ class WordList extends Component {
 					<Row>
 						<Col>Selected Terms: <br/>{"[" + this.state.termList.join(", ") + "]"}</Col>
 						<Col>
-							<Button color="primary" block>Search</Button>
+							<Button color="primary" onClick={this.handleSubmit} block>Search</Button>
 						</Col>
 						<Col>{this.getPagination()}</Col>
 					</Row>

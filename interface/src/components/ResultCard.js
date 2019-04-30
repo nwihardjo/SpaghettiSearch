@@ -21,15 +21,15 @@ class ResultCard extends Component {
   }
   componentDidMount (props) {
     // extract only the date
-    console.log(this.props.data['Summary'])
+    console.log(this.props.data)
     var date=this.props.data['Mod_date'].match(/(\d{4})-(\d{2})-(\d{2})/)
-    this.setState({Url: this.props.data['Url']['Host'],
+    this.setState({Url: this.props.data['Url'],
                   Mod_date: date[0],
                   Page_title: this.props.data['Page_title'],
                   Page_size: this.props.data['Page_size'],
-                  Children: this.props.data['Children'],
-                  Parents: this.props.data['Parents'],
-                  Words_mapping: this.props.data['Words_mapping'],
+                  Children: ((this.props.data['Children']!=null) ? this.props.data['Children']: []),
+                  Parents: ((this.props.data['Parents']!=null) ? this.props.data['Parents']: []),
+                  Words_mapping: ((this.props.data['Words_mapping']!=null)?this.props.data['Words_mapping']:{}),
                   PageRank: this.props.data['PageRank'],
                   FinalRank: this.props.data['FinalRank'],
                   Summary: this.props.data['Summary']});
@@ -39,7 +39,7 @@ class ResultCard extends Component {
       <Card className='custom'>
         <CardBody>
           <CardLink className='title' href={this.state.Url}> {this.state.Page_title} </CardLink>
-          <small className="text-muted"><span>&#8729;</span> {this.state.FinalRank}</small>
+          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}</small>
           <CardSubtitle> {this.state.Url} </CardSubtitle>
           <div className='row'>
           {Object.keys(this.state.Words_mapping).map((word, freq) => {

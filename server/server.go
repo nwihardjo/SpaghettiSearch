@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
-	"strings"
+	// "strings"
 	db "the-SearchEngine/database"
 	"the-SearchEngine/retrieval"
 	"time"
@@ -45,7 +45,7 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 		log.Print("Querying terms:", query)
 
 		timer := time.Now()
-		result := retrieval.Retrieve(query, ctx, forw, inv)
+		result := retrieval.Retrieve(query.Query, ctx, forw, inv)
 		json.NewEncoder(w).Encode(result)
 
 		log.Print("Query processed in ", time.Since(timer))
@@ -105,6 +105,7 @@ func main() {
 	// start server
 	router := mux.NewRouter()
 	log.Print("Server is running")
+	router.HandleFunc("/query", GetWebpages)
 	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
 	router.HandleFunc("/wordlist/{pre}", GetWordList).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8080", router))
