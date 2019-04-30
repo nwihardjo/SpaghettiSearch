@@ -45,7 +45,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			// retrieve result from future, assign ranking
 			docMetaData := <-metadata
 			docMetaData.PageRank = PR
-			docMetaData.FinalRank = 0.25*PR + 0.45*doc.TitleRank + 0.3*doc.BodyRank
+			docMetaData.FinalRank = 0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank
 			docMetaData.Summary = <-summary
 
 			out <- docMetaData
