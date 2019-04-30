@@ -115,7 +115,7 @@ func sortMap(m map[string]uint32) map[string]uint32 {
 		return nil
 	}
 
-	ss := make([]kv_sort, len(m))
+	ss := make([]kv_sort, 0, len(m))
 	for k, v := range m {
 		ss = append(ss, kv_sort{k, v})
 	}

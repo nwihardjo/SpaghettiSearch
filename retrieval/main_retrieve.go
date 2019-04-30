@@ -78,14 +78,14 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	docsInChan := genAggrDocsPipeline(aggregatedDocs)
 
 	// fan-out to calculate final rank from PR and page magnitude
-	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 0.75))
+	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 0.8))
 	docsOutChan := [](<-chan Rank_combined){}
 	for i := 0; i < numFanOut; i++ {
 		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised)))
 	}
 
 	// fan-in final rank (generator pattern) and sort the result
-	finalResult := make([]Rank_combined, len(aggregatedDocs))
+	finalResult := make([]Rank_combined, 0, len(aggregatedDocs))
 	for docRank := range fanInResult(docsOutChan) {
 		finalResult = appendSort(finalResult, docRank)
 	}
