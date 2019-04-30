@@ -145,192 +145,208 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 	if checkIndex {
 		cacheFileD, e := ioutil.ReadFile(DocsDir+docHashString)
 		if e != nil {
-			panic(e)
-		}
-		cacheFileDHash := md5.Sum(cacheFileD)
-		currentDocHash := md5.Sum(doc)
-		if currentDocHash != cacheFileDHash {
-			type DocPosHashStruct struct {
-				DocPos map[string][]float32
-				WordHash string
-			}
-			tempPageTitle := parser.Laundry(strings.Join(dI.Page_title, " "))
-			wordChann := make(chan DocPosHashStruct, len(tempPageTitle))
-			var wgGet sync.WaitGroup
-			for _, word := range tempPageTitle {
-				h := md5.Sum([]byte(word))
-				hStr := hex.EncodeToString(h[:])
-				wgGet.Add(1)
-				go func(hS string) {
-					defer wgGet.Done()
-					docP_, e := inverted[0].Get(ctx, hS)
-					if e != nil {
-						panic(e)
-					}
-					docP, _ := docP_.(map[string][]float32)
-					wordChann <- DocPosHashStruct{docP, hS}
-				}(hStr)
-			}
-
-			wgGet.Wait()
-			close(wordChann)
-			for dphs := range wordChann {
-				docP := dphs.DocPos
-				hStr := dphs.WordHash
-				if len(docP) > 1 {
-					// remove this doc from this row
-					delete(docP, docHashString)
-					if e = bwInv[0].BatchSet(ctx, hStr, docP); e != nil {
-						panic(e)
-					}
-				} else if docP[docHashString] != nil {
-					// delete this row
-					if e = inverted[0].Delete(ctx, hStr); e != nil {
-						panic(e)
-					}
+			fmt.Println("\n--DEBUG--")
+			fmt.Println(urlString)
+			fmt.Println(e)
+			checkIndex = false
+		} else {
+			cacheFileDHash := md5.Sum(cacheFileD)
+			currentDocHash := md5.Sum(doc)
+			if currentDocHash != cacheFileDHash {
+				type DocPosHashStruct struct {
+					DocPos map[string][]float32
+					WordHash string
 				}
-			}
-
-			wordChann = make(chan DocPosHashStruct, len(dI.Words_mapping))
-			for wordHash, _ := range dI.Words_mapping {
-				wgGet.Add(1)
-				go func(whS string) {
-					defer wgGet.Done()
-					docP_, e := inverted[1].Get(ctx, whS)
-					if e != nil {
-						panic(e)
-					}
-					docP, _ := docP_.(map[string][]float32)
-					wordChann <- DocPosHashStruct{docP, whS}
-				}(wordHash)
-			}
-
-			wgGet.Wait()
-			close(wordChann)
-			for dphs := range wordChann {
-				docP := dphs.DocPos
-				wordHash := dphs.WordHash
-				if len(docP) > 1 {
-					// remove this doc from this row
-					delete(docP, docHashString)
-					if e = bwInv[1].BatchSet(ctx, wordHash, docP); e != nil {
-						panic(e)
-					}
-				} else if docP[docHashString] != nil {
-					// delete this row
-					if e = inverted[1].Delete(ctx, wordHash); e != nil {
-						panic(e)
-					}
-				}
-			}
-
-			type DocInfoChildStruct struct {
-				DocInfo database.DocInfo
-				ChildHash string
-			}
-			newChann := make(chan DocInfoChildStruct, len(dI.Children))
-			for _, c := range dI.Children {
-				wgGet.Add(1)
-				go func(cHash string) {
-					defer wgGet.Done()
-					dIc_, e := forward[1].Get(ctx, cHash)
-					if e != nil {
-						panic(e)
-					}
-					dIc, _ := dIc_.(database.DocInfo)
-					newChann <- DocInfoChildStruct{dIc, c}
-				}(c)
-			}
-
-			wgGet.Wait()
-			close(newChann)
-			type DocPosHashChildStruct struct {
-				DocPos map[string][]float32
-				WordHash string
-				ChildHash string
-			}
-			arrOfChann := make([]chan DocPosHashChildStruct, len(dI.Children))
-			arrOfWGs := make([]sync.WaitGroup, len(dI.Children))
-			arrIdx := -1
-			for dIcs := range newChann {
-				dIc := dIcs.DocInfo
-				c := dIcs.ChildHash
-				arrIdx += 1
-				tempParents := dIc.Parents
-				dIc.Parents = make(map[string][]string)
-				var innerWordHashes []string
-
-				for k, t := range tempParents {
-					if k != docHashString {
-						dIc.Parents[k] = t
-					} else {
-						innerWordHashes = t
-					}
-				}
-				if e = bwFrw[1].BatchSet(ctx, c, dIc); e != nil {
-					panic(e)
+				tempPageTitle := parser.Laundry(strings.Join(dI.Page_title, " "))
+				wordChann := make(chan DocPosHashStruct, len(tempPageTitle))
+				var wgGet sync.WaitGroup
+				for _, word := range tempPageTitle {
+					h := md5.Sum([]byte(word))
+					hStr := hex.EncodeToString(h[:])
+					wgGet.Add(1)
+					go func(hS string) {
+						defer wgGet.Done()
+						docP_, e := inverted[0].Get(ctx, hS)
+						if e != nil {
+							fmt.Println("\n---DEBUG---")
+							fmt.Println(e)
+							wordChann <- DocPosHashStruct{nil, ""}
+						} else {
+							docP, _ := docP_.(map[string][]float32)
+							wordChann <- DocPosHashStruct{docP, hS}
+						}
+					}(hStr)
 				}
 
-				arrOfChann[arrIdx] = make(chan DocPosHashChildStruct, len(innerWordHashes))
-				// arrOfWGs[arrIdx] = sync.WaitGroup
+				wgGet.Wait()
+				close(wordChann)
+				for dphs := range wordChann {
+					docP := dphs.DocPos
+					hStr := dphs.WordHash
+					if hStr == "" {
+						continue
+					}
+					if len(docP) > 1 {
+						// remove this doc from this row
+						delete(docP, docHashString)
+						if e = bwInv[0].BatchSet(ctx, hStr, docP); e != nil {
+							panic(e)
+						}
+					} else if docP[docHashString] != nil {
+						// delete this row
+						if e = inverted[0].Delete(ctx, hStr); e != nil {
+							panic(e)
+						}
+					}
+				}
 
-				for _, w := range innerWordHashes {
-					arrOfWGs[arrIdx].Add(1)
+				wordChann = make(chan DocPosHashStruct, len(dI.Words_mapping))
+				for wordHash, _ := range dI.Words_mapping {
+					wgGet.Add(1)
+					go func(whS string) {
+						defer wgGet.Done()
+						docP_, e := inverted[1].Get(ctx, whS)
+						if e != nil {
+							fmt.Println("\n---DEBUG---")
+							fmt.Println(e)
+							wordChann <- DocPosHashStruct{nil, ""}
+						} else {
+							docP, _ := docP_.(map[string][]float32)
+							wordChann <- DocPosHashStruct{docP, whS}
+						}
+					}(wordHash)
+				}
 
-					wHash := md5.Sum([]byte(w))
-					wHashString := hex.EncodeToString(wHash[:])
-					go func(wHStr string, childHash string, idx int) {
-						defer arrOfWGs[idx].Done()
-						dpw_, e := inverted[0].Get(ctx, wHStr)
+				wgGet.Wait()
+				close(wordChann)
+				for dphs := range wordChann {
+					docP := dphs.DocPos
+					wordHash := dphs.WordHash
+					if wordHash == "" {
+						continue
+					}
+					if len(docP) > 1 {
+						// remove this doc from this row
+						delete(docP, docHashString)
+						if e = bwInv[1].BatchSet(ctx, wordHash, docP); e != nil {
+							panic(e)
+						}
+					} else if docP[docHashString] != nil {
+						// delete this row
+						if e = inverted[1].Delete(ctx, wordHash); e != nil {
+							panic(e)
+						}
+					}
+				}
+
+				type DocInfoChildStruct struct {
+					DocInfo database.DocInfo
+					ChildHash string
+				}
+				newChann := make(chan DocInfoChildStruct, len(dI.Children))
+				for _, c := range dI.Children {
+					wgGet.Add(1)
+					go func(cHash string) {
+						defer wgGet.Done()
+						dIc_, e := forward[1].Get(ctx, cHash)
 						if e != nil {
 							panic(e)
 						}
-						dpw, _ := dpw_.(map[string][]float32)
-						arrOfChann[idx] <- DocPosHashChildStruct{dpw, wHStr, childHash}
-					}(wHashString, c, arrIdx)
+						dIc, _ := dIc_.(database.DocInfo)
+						newChann <- DocInfoChildStruct{dIc, c}
+					}(c)
 				}
-			}
-			for i, _ := range arrOfWGs {
-				arrOfWGs[i].Wait()
-			}
-			for _, channC := range arrOfChann {
-				close(channC)
 
-				for dphs := range channC {
-					dpw := dphs.DocPos
-					wHashString := dphs.WordHash
-					childHash := dphs.ChildHash
-					if len(dpw) > 1 {
-						// remove this doc from this row
-						delete(dpw, childHash)
-						if e = bwInv[0].BatchSet(ctx, wHashString, dpw); e != nil {
-							panic(e)
+				wgGet.Wait()
+				close(newChann)
+				type DocPosHashChildStruct struct {
+					DocPos map[string][]float32
+					WordHash string
+					ChildHash string
+				}
+				arrOfChann := make([]chan DocPosHashChildStruct, len(dI.Children))
+				arrOfWGs := make([]sync.WaitGroup, len(dI.Children))
+				arrIdx := -1
+				for dIcs := range newChann {
+					dIc := dIcs.DocInfo
+					c := dIcs.ChildHash
+					arrIdx += 1
+					tempParents := dIc.Parents
+					dIc.Parents = make(map[string][]string)
+					var innerWordHashes []string
+
+					for k, t := range tempParents {
+						if k != docHashString {
+							dIc.Parents[k] = t
+						} else {
+							innerWordHashes = t
 						}
-					} else if dpw[childHash] != nil {
-						// delete this row
-						if e = inverted[0].Delete(ctx, wHashString); e != nil {
-							panic(e)
+					}
+					if e = bwFrw[1].BatchSet(ctx, c, dIc); e != nil {
+						panic(e)
+					}
+
+					arrOfChann[arrIdx] = make(chan DocPosHashChildStruct, len(innerWordHashes))
+					// arrOfWGs[arrIdx] = sync.WaitGroup
+
+					for _, w := range innerWordHashes {
+						arrOfWGs[arrIdx].Add(1)
+
+						wHash := md5.Sum([]byte(w))
+						wHashString := hex.EncodeToString(wHash[:])
+						go func(wHStr string, childHash string, idx int) {
+							defer arrOfWGs[idx].Done()
+							dpw_, e := inverted[0].Get(ctx, wHStr)
+							if e != nil {
+								panic(e)
+							}
+							dpw, _ := dpw_.(map[string][]float32)
+							arrOfChann[idx] <- DocPosHashChildStruct{dpw, wHStr, childHash}
+						}(wHashString, c, arrIdx)
+					}
+				}
+				for i, _ := range arrOfWGs {
+					arrOfWGs[i].Wait()
+				}
+				for _, channC := range arrOfChann {
+					close(channC)
+
+					for dphs := range channC {
+						dpw := dphs.DocPos
+						wHashString := dphs.WordHash
+						childHash := dphs.ChildHash
+						if len(dpw) > 1 {
+							// remove this doc from this row
+							delete(dpw, childHash)
+							if e = bwInv[0].BatchSet(ctx, wHashString, dpw); e != nil {
+								panic(e)
+							}
+						} else if dpw[childHash] != nil {
+							// delete this row
+							if e = inverted[0].Delete(ctx, wHashString); e != nil {
+								panic(e)
+							}
 						}
 					}
 				}
-			}
 
-			// Flush the writes
-			for _, f := range bwFrw {
-				if err := f.Flush(ctx); err != nil {
-					panic(err)
+				// Flush the writes
+				for _, f := range bwFrw {
+					if err := f.Flush(ctx); err != nil {
+						panic(err)
+					}
 				}
-			}
-			for _, i := range bwInv {
-				if err := i.Flush(ctx); err != nil {
-					panic(err)
+				for _, i := range bwInv {
+					if err := i.Flush(ctx); err != nil {
+						panic(err)
+					}
 				}
+			} else {
+				// If the doc exists and there is no changes, return
+				// no need to update
+				fmt.Println("\n\n[DEBUG 2] NO UPDATE NEEDED\n\n")
+				return
 			}
-		} else {
-			// If the doc exists and there is no changes, return
-			// no need to update
-			fmt.Println("\n\n[DEBUG 2] NO UPDATE NEEDED\n\n")
-			return
 		}
 	}
 
@@ -437,7 +453,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 				wHashString := hex.EncodeToString(wHash[:])
 				invKeyVals := make(map[string][]float32)
 				normTF := float32(float32(tttt[w]) / float32(maxFreq))
-				invKeyVals[docHashString] = append([]float32{normTF}, babi[w]...)
+				invKeyVals[kid] = append([]float32{normTF}, babi[w]...)
 				// append the added entry (docHash and pos) to inverted file
 				// value has type of map[DocHash][]uint32 (docHash -> list of position)
 				value, err := inverted[0].Get(ctx, wHashString)
@@ -450,7 +466,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 					panic(err)
 				} else {
 					// append new docHash entry to the existing one
-					value.(map[string][]float32)[docHashString] = invKeyVals[docHashString]
+					value.(map[string][]float32)[kid] = invKeyVals[kid]
 
 					// load new appended value of inverted table according to the wordHash
 					if err = bw_anchor.BatchSet(ctx, wHashString, value); err != nil {
@@ -491,7 +507,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 				wHashString := hex.EncodeToString(wHash[:])
 				invKeyVals := make(map[string][]float32)
 				normTF := float32(float32(tttt[w]) / float32(maxFreq))
-				invKeyVals[docHashString] = append([]float32{normTF}, babi[w]...)
+				invKeyVals[kid] = append([]float32{normTF}, babi[w]...)
 				// append the added entry (docHash and pos) to inverted file
 				// value has type of map[DocHash][]uint32 (docHash -> list of position)
 				value, err := inverted[0].Get(ctx, wHashString)
@@ -504,7 +520,7 @@ func Index(doc []byte, rootNode *html.Node, urlString string, lock2 *sync.RWMute
 					panic(err)
 				} else {
 					// append new docHash entry to the existing one
-					value.(map[string][]float32)[docHashString] = invKeyVals[docHashString]
+					value.(map[string][]float32)[kid] = invKeyVals[kid]
 
 					// load new appended value of inverted table according to the wordHash
 					if err = bw_anchor.BatchSet(ctx, wHashString, value); err != nil {

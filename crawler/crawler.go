@@ -44,7 +44,7 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 				isMedia := false
 				mediaExs := []string{".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi"}
 				for _, ex := range mediaExs {
-					if strings.HasSuffix(thisURL, ex) {
+					if strings.HasSuffix(strings.ToLower(thisURL), ex) {
 						isMedia = true
 						break
 					}
