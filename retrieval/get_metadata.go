@@ -3,13 +3,14 @@ package retrieval
 import (
 	"context"
 	"math"
-	"bytes"
+	//"bytes"
 	"sync"
-	"io/ioutil"
+//	"io/ioutil"
 	db "the-SearchEngine/database"
-	"strings"
-	"golang.org/x/net/html"
-	"the-SearchEngine/indexer"
+	"log"
+	//"strings"
+	//"golang.org/x/net/html"
+//	"the-SearchEngine/indexer"
 )
 
 func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int) <-chan Rank_combined {
@@ -47,6 +48,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			docMetaData.PageRank = PR
 			docMetaData.FinalRank = 0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank
 			docMetaData.Summary = <-summary
+			log.Print(docMetaData.Summary)
 
 			out <- docMetaData
 		}
@@ -56,49 +58,55 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 }
 
 func getSummary(docHash string)  <-chan string{
-	out := make(chan string, 1)
-
+	out := make(chan string)
+	defer close(out)
 	go func() {
 		// read cached files
-		htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
-		if err != nil {
-			panic(err)
-		}
-		doc, err := html.Parse(bytes.NewReader(htmResp))
-		if err != nil {
-			panic(err)
-		}
-		
-		// extract text from html body
-		var words []string
-		var extractWord func(*html.Node)
-		extractWord = func(n *html.Node) {
-			if n.Type == html.TextNode{
-				tempD := n.Parent.Data
-				cleaned := strings.TrimSpace(n.Data)
-				if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
-					words = append(words, cleaned)
+		//htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
+		if true {
+			log.Print("beenheredonethat")
+			temp := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa"
+			out <- temp
+		} else {
+/*
+			doc, err := html.Parse(bytes.NewReader(htmResp))
+			if err != nil {
+				panic(err)
+			}
+			
+			// extract text from html body
+			var words []string
+			var extractWord func(*html.Node)
+			extractWord = func(n *html.Node) {
+				if n.Type == html.TextNode{
+					tempD := n.Parent.Data
+					cleaned := strings.TrimSpace(n.Data)
+					if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
+						words = append(words, cleaned)
+					}
+				}
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					extractWord(c)
 				}
 			}
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				extractWord(c)
+			extractWord(doc)
+			
+			// pre-process words extracted
+			words = strings.Fields(strings.Join(words, " "))
+			
+			if len(words) > 21 {
+				var temp []string
+				i := int(math.Ceil(float64(len(words)) / 2.0))
+				temp = append(temp, "...")
+				temp = append(temp, words[i-10:i+11]...)
+				temp = append(temp, "...")
+				out <- strings.Join(temp, " ")
+			} else {
+				words = append(words, "...")
+				out <- strings.Join(words, " ")
 			}
-		}
-		extractWord(doc)
-		
-		// pre-process words extracted
-		words = strings.Fields(strings.Join(words, " "))
-		
-		if len(words) > 21 {
-			var temp []string
-			i := int(math.Ceil(float64(len(words)) / 2.0))
-			temp = append(temp, "...")
-			temp = append(temp, words[i-10:i+11]...)
-			temp = append(temp, "...")
-			out <- strings.Join(temp, " ")
-		} else {
-			words = append(words, "...")
-			out <- strings.Join(words, " ")
+			log.Print("out")
+*/
 		}
 	}()
 	return out
