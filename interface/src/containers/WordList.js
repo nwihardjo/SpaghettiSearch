@@ -36,6 +36,7 @@ class WordList extends Component {
       '/query',
       {query: this.state.termList.join(" ")}
     );
+    document.location.reload(true)
   }
 
 	updateCurrData(pre) {
