@@ -163,7 +163,7 @@ func Crawl(sem *semaphore.Weighted, parentURL string,
 	}
 
 	mutex.Lock()
-	indexer.Index(htmlData, doc, currentURL, lock2, lm, ps, mutex, inv, forw, parentURL, childsArr)
+	indexer.Index(htmlData, doc, currentURL, lm, ps, inv, forw, parentURL, childsArr)
 	mutex.Unlock()
 
 	resp.Body.Close()
