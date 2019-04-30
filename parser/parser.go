@@ -79,7 +79,7 @@ func tokenize(doc []byte/**html.Node*/, baseURL string) (title string,
 		} else if n.Type == html.TextNode {
 			tempD := n.Parent.Data
 			cleaned := strings.TrimSpace(n.Data)
-			if tempD != "title" && tempD != "script" && tempD != "style" && cleaned != "" {
+			if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && cleaned != "" {
 				if tempD == "a" {
 					for _, attr := range n.Parent.Attr {
 						if attr.Key == "href" {
