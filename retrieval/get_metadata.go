@@ -77,32 +77,9 @@ func getSummary(docHash string)  <-chan string{
 				tempD := n.Parent.Data
 				cleaned := strings.TrimSpace(n.Data)
 				if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
-					if tempD == "a" {
-						for _, attr := range n.Parent.Attr {
-							if attr.Key == "href" {
-								/* Skip if no href or if href is anchor or if href is mail or script */
-								if attr.Val == "" ||
-									attr.Val[0] == '#' ||
-									strings.HasPrefix(attr.Val, "javascript") ||
-									strings.HasPrefix(attr.Val, "mailto") {
-									break
-								}
-
-								thisURL := ""
-								/* Make sure the URL ends without '/' */
-								if strings.HasSuffix(attr.Val, "/") {
-									thisURL = attr.Val[:len(attr.Val)-1]
-								} else {
-									thisURL = attr.Val
-								}
-								if len(thisURL) == 0 {
-									break
-								}
-							}
-							break
-						}
+					if tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav"{
+						words = append(words, cleaned)
 					}
-					words = append(words, cleaned)
 				}
 			}
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
