@@ -25,7 +25,9 @@ func setHeader(w http.ResponseWriter) {
 }
 
 func GetWebpages(w http.ResponseWriter, r *http.Request) {
-	setHeader(w)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 	//---------------- QUERY PARSING ----------------//
 
 	params := mux.Vars(r)
@@ -39,10 +41,10 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	timer := time.Now()
 
 	result := retrieval.Retrieve(query, ctx, forw, inv)
+	log.Print("result is ", len(result))
 
 	json.NewEncoder(w).Encode(result)
-
-	log.Print("Query processed in ", time.Since(timer))
+	log.Print(time.Since(timer))
 }
 
 func main() {
