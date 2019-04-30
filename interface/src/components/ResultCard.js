@@ -34,8 +34,42 @@ class ResultCard extends Component {
                   FinalRank: this.props.data['FinalRank'],
                   Summary: this.props.data['Summary']});
   }
+  renderParent = () => {
+    console.log(this.state.Parents)
+    if(this.state.Parents.length > 0) {
+      return(
+        <div>
+        <b> Parents: </b>
+        {
+          this.state.Parents.map((link, i) => {
+            return(<a href={link}>Parent{i+1} {'   '}</a>)
+          })
+        }
+        </div>
+      )
+    } else {
+      return <div></div>;
+    }
+  }
+  renderChildren = () => {
+    if(this.state.Children.length > 0) {
+      return(
+        <div>
+        <b> Children: </b>
+        {
+          this.state.Children.map((link, i) => {
+            return(<a href={link}>Child{i+1} {'   '}</a>)
+          })
+        }
+        </div>
+      )
+    } else {
+      return <div></div>;
+    }
+  }
   render() {
     return (
+      <a className='card-link--nostyle' href={this.state.Url}>
       <Card className='custom'>
         <CardBody>
           <CardLink className='title' href={this.state.Url}> {this.state.Page_title} </CardLink>
@@ -51,18 +85,8 @@ class ResultCard extends Component {
           <CardText>
           {this.state.Summary} <br/>
           <small className="text-muted">
-          <b> Parents: </b>
-          {
-            this.state.Parents.map((link, i) => {
-              return(<div>{link}<br/></div>)
-            })
-          }
-          <b> Children: </b>
-          {
-            this.state.Children.map((link, i) => {
-              return(<div>{link}<br/></div>)
-            })
-          }
+          {this.renderParent()}
+          {this.renderChildren()}
           </small>
           </CardText>
         </CardBody>
@@ -75,8 +99,15 @@ class ResultCard extends Component {
           </CardText>
         </CardBody>
       </Card>
+      </a>
     );
   }
 }
+// {(this.state.Parents != [])?return(<b> Parents: </b>):}
+// {
+//   this.state.Parents.map((link, i) => {
+//     return(<div>{link}<br/></div>)
+//   })
+// }
 
 export default ResultCard;
