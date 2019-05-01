@@ -42,7 +42,11 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 
 				/* Ignore media files */
 				isMedia := false
-				mediaExs := []string{".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi"}
+				mediaExs := []string{
+					".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi",
+					".zip", ".pptx", ".ppt", ".rar", ".doc", ".docx",
+					".tar", ".gz", ".xz", ".bz", ".7z",
+				}
 				for _, ex := range mediaExs {
 					if strings.HasSuffix(strings.ToLower(thisURL), ex) {
 						isMedia = true
@@ -162,9 +166,9 @@ func Crawl(sem *semaphore.Weighted, parentURL string,
 		childsArr = append(childsArr, k)
 	}
 
-	mutex.Lock()
-	indexer.Index(htmlData, doc, currentURL, lm, ps, inv, forw, parentURL, childsArr)
-	mutex.Unlock()
+	// mutex.Lock()
+	indexer.Index(htmlData, doc, currentURL, lm, ps, mutex, inv, forw, parentURL, childsArr)
+	// mutex.Unlock()
 
 	resp.Body.Close()
 }

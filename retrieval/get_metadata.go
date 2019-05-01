@@ -7,17 +7,19 @@ import (
 	"sync"
 	"io/ioutil"
 	db "the-SearchEngine/database"
-	"log"
 	"strings"
 	"golang.org/x/net/html"
 	"the-SearchEngine/indexer"
 )
 
 func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int) <-chan Rank_combined {
-	out := make(chan Rank_combined)
-	go func() {
-		for doc := range docs {
-			log.Print(doc)
+	out := make(chan Rank_combined, len(docs))
+	var wg sync.WaitGroup
+	for doc := range docs {
+		wg.Add(1)
+		go func(doc Rank_result) {
+			defer wg.Done()
+
 			// get doc metadata using future pattern for faster performance
 			metadata := getDocInfo(ctx, doc.DocHash, forw)
 			summary := getSummary(doc.DocHash)
@@ -59,9 +61,10 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			docMetaData.Summary = <-summary
 
 			out <- docMetaData
-		}
-		close(out)
-	}()
+		}(doc)
+	}
+	wg.Wait()
+	close(out)
 	return out
 }
 

@@ -34,7 +34,6 @@ func GetWebpages(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		return
 	}
-	log.Print(r.Body)
 
 	if r.Method == "POST" {
 		var query request

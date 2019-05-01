@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"bytes"
+	//"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/surgebase/porter2"
@@ -20,7 +20,7 @@ type Term struct {
 	Pos     map[string][]float32
 }
 
-func Parse(doc /**html.Node*/[]byte, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
+func Parse(doc *html.Node, baseURL string) (titleInfo Term, bodyInfo Term, fancyInfo map[string]Term, cleanFancy map[string][]string) {
 	title, words, meta, fancy, fancyURLs := tokenize(doc, baseURL)
 	// Clean terms in title and body
 	cleanTitle := Laundry(title)
@@ -47,13 +47,13 @@ func Parse(doc /**html.Node*/[]byte, baseURL string) (titleInfo Term, bodyInfo T
 	return
 }
 
-func tokenize(doc []byte/**html.Node*/, baseURL string) (title string,
+func tokenize(doc *html.Node, baseURL string) (title string,
 	words, meta, fancy, fancyURLs []string) {
 
-	doc_, err := html.Parse(bytes.NewReader(doc))
-	if err != nil {
-		panic(err)
-	}
+	//doc_, err := html.Parse(bytes.NewReader(doc))
+	//if err != nil {
+	//	panic(err)
+	//}
 	var f func(*html.Node, string)
 	f = func(n *html.Node, baseURL string) {
 		if n.Type == html.ElementNode {
@@ -104,7 +104,11 @@ func tokenize(doc []byte/**html.Node*/, baseURL string) (title string,
 
 							/* Ignore media files */
 							isMedia := false
-							mediaExs := []string{".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi"}
+							mediaExs := []string{
+								".mp3", ".pdf", ".png", ".jpg", ".mp4", ".avi",
+								".zip", ".pptx", ".ppt", ".rar", ".doc", ".docx",
+								".tar", ".gz", ".xz", ".bz", ".7z",
+							}
 							for _, ex := range mediaExs {
 								if strings.HasSuffix(strings.ToLower(thisURL), ex) {
 									isMedia = true
@@ -150,7 +154,7 @@ func tokenize(doc []byte/**html.Node*/, baseURL string) (title string,
 			f(c, baseURL)
 		}
 	}
-	f(doc_, baseURL)
+	f(doc, baseURL)
 
 	return
 }
