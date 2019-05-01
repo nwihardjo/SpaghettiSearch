@@ -1,7 +1,6 @@
 package parser
 
 import (
-	//"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/surgebase/porter2"
@@ -50,10 +49,6 @@ func Parse(doc *html.Node, baseURL string) (titleInfo Term, bodyInfo Term, fancy
 func tokenize(doc *html.Node, baseURL string) (title string,
 	words, meta, fancy, fancyURLs []string) {
 
-	//doc_, err := html.Parse(bytes.NewReader(doc))
-	//if err != nil {
-	//	panic(err)
-	//}
 	var f func(*html.Node, string)
 	f = func(n *html.Node, baseURL string) {
 		if n.Type == html.ElementNode {
@@ -116,7 +111,7 @@ func tokenize(doc *html.Node, baseURL string) (title string,
 								}
 							}
 							if isMedia {
-								continue
+								break
 							}
 
 							if len(thisURL) == 0 {
@@ -139,6 +134,9 @@ func tokenize(doc *html.Node, baseURL string) (title string,
 									tail = urlRe.ReplaceAllString(sc+"://"+hn+thisURL, "")
 								}
 							} else {
+								if thisURL == baseURL {
+									break
+								}
 								tail = urlRe.ReplaceAllString(thisURL, "")
 							}
 							fancyURLs = append(fancyURLs, tail)

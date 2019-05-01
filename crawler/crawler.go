@@ -90,6 +90,9 @@ func EnqueueChildren(n *html.Node, baseURL string, queue *channels.InfiniteChann
 						children[tail] = true
 					}
 				} else {
+					if thisURL == baseURL {
+						continue
+					}
 					head := urlRe.ReplaceAllString(baseURL, "")
 					tail := urlRe.ReplaceAllString(thisURL, "")
 					queue.In() <- []string{head, tail}
