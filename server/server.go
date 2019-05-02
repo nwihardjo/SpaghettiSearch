@@ -107,5 +107,5 @@ func main() {
 	router.HandleFunc("/query", GetWebpages)
 	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
 	router.HandleFunc("/wordlist/{pre}", GetWordList).Methods("GET")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(http.ListenAndServe("10.89.242.180:8080", router))
 }
