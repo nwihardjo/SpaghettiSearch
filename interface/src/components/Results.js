@@ -29,7 +29,6 @@ class Results extends Component {
       }
     })
     .then((response) => {
-      console.log(response.data);
       var filtered = response.data.filter(function (el) {
         return el.Url != "";
       })
@@ -40,12 +39,13 @@ class Results extends Component {
     });
   }
   render() {
+		let t = this.state.query.split(" ");
     return (
       <div className="results">
       {
         this.state.results.map((data, i) => {
           return(
-            <ResultCard data={data}/>
+            <ResultCard data={data} term={t}/>
           );
         })
       }
