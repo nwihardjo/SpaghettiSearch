@@ -59,17 +59,14 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64, summary st
 	if len(metadata.Parents) == 0 {
 		parentList = nil
 	} else {
-		// metadata.Parents is map[string][]string
-		for parentHash, _ := range metadata.Parents {
-			if parentHash == "" {
-				continue
-			}
+		if len(metadata.Parents) > 5 {
+			parentList = make([]string, 0, 5)
+		} else {
+			parentList = make([]string, 0, len(metadata.Parents))
+		}
 
-			if len(parentList) == 0 {
-				parentList = []string{parentHash}
-			} else {
-				parentList = append(parentList, parentHash)
-			}
+		for parentHash, _ := range metadata.Parents {
+			parentList = append(parentList, parentHash)
 			if len(parentList) == 5 {
 				break
 			}
@@ -79,26 +76,32 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64, summary st
 	if len(metadata.Children) == 0 {
 		childList = nil
 	} else {
+		if len(metadata.Children) > 5 {
+			childList = make([]string, 0, 5)
+		} else {
+			childList = make([]string, 0, len(metadata.Children))
+		}
+
 		// metadata.Children is []string
 		for _, childHash := range metadata.Children {
-			if childHash == "" {
-				continue
-			}
-
-			if len(childList) == 0 {
-				childList = []string{childHash}
-			} else {
-				childList = append(childList, childHash)
-			}
+			childList = append(childList, childHash)
 			if len(childList) == 5 {
 				break
 			}
 		}
 	}
 
+	// check if page title is empty because not indexed yet
+	var title string
+	if len(metadata.Page_title) == 0 {
+		title = metadata.Url.Host
+	} else {
+		title = strings.Join(metadata.Page_title, " ");
+	}
+
 	return Rank_combined{
 		Url:           metadata.Url.String(),
-		Page_title:    strings.Join(metadata.Page_title, " "),
+		Page_title:    title,
 		Mod_date:      metadata.Mod_date,
 		Page_size:     metadata.Page_size,
 		Children:      childList,
@@ -157,6 +160,10 @@ func getPhrase(s string) []string {
 }
 
 func sortFloat32(slice []float32) []float32 {
+	if len(slice) == 0 {
+		return nil
+	}
+
 	sliceFloat64 := make([]float64, len(slice))
 	for i := 0; i < len(slice); i++ {
 		sliceFloat64[i] = float64(slice[i])

@@ -20,7 +20,7 @@ const (
 	// Default values are used. For garbage-collection purposes
 	// TODO: to be fine-tuned
 	badgerDiscardRatio = 0.5
-	badgerGCInterval   = 10 * time.Minute
+	badgerGCInterval   = 2 * time.Hour
 )
 
 var (

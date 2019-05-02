@@ -14,7 +14,9 @@ import (
 
 func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int) <-chan Rank_combined {
 	out := make(chan Rank_combined, len(docs))
+	defer close(out)
 	var wg sync.WaitGroup
+
 	for doc := range docs {
 		wg.Add(1)
 		go func(doc Rank_result) {
@@ -44,16 +46,16 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			queryMagnitude := math.Sqrt(float64(queryLength))
 
 			docMetaData := <-metadata
+			
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
+
+			// make rank to be 0 if division by zero occurs because it hasn't been indexed
 			if math.IsNaN(doc.BodyRank) {
 				doc.BodyRank = 0
 			}
 			if math.IsNaN(doc.TitleRank) {
 				doc.TitleRank = 0
-			}
-			if math.IsNaN(PR) {
-				PR = 0
 			}
 
 			docMetaData.PageRank = PR
@@ -64,7 +66,6 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 		}(doc)
 	}
 	wg.Wait()
-	close(out)
 	return out
 }
 

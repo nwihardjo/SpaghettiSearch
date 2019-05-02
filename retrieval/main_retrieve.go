@@ -38,7 +38,6 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	//---------------- PHRASE RETRIEVAL ----------------//
 
 	// use future pattern
-	// TODO: double-check what laundry will return if "" is passed
 	docPhrase := getPhraseFromInverted(ctx, phraseTokenised, inv)
 
 	//---------------- NON-PHRASE TERM RETRIEVAL ----------------//
@@ -47,7 +46,7 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	termInChan := genTermPipeline(queryTokenised)
 
 	// fan-out to get term occurence from inverted tables
-	numFanOut := int(math.Ceil(float64(len(queryTokenised)) * 0.75))
+	numFanOut := int(math.Ceil(float64(len(queryTokenised)) * 0.8))
 	termOutChan := [](<-chan map[string]Rank_term){}
 	for i := 0; i < numFanOut; i++ {
 		termOutChan = append(termOutChan, getFromInverted(ctx, termInChan, inv))
@@ -91,14 +90,8 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	}
 
 	if len(finalResult) > 50 {
-		for i := 0; i < 50; i++ {
-			finalResult[i].FinalRank /= (finalResult[0].FinalRank)
-		}
 		return finalResult[:50]
 	} else {
-		for i := 0; i < len(finalResult); i++ {
-			finalResult[i].FinalRank /= (finalResult[0].FinalRank)
-		}
 		return finalResult
 	}
 }
@@ -131,17 +124,34 @@ func genAggrDocsPipeline(docRank map[string]Rank_term) <-chan Rank_result {
 	return out
 }
 
+func getInvTitle(ctx context.Context, inv db.DB, wordHash string) <-chan map[string][]float32 {
+	out := make(chan map[string][]float32, 1)
+	go func () {
+		var ret map[string][]float32
+		if v, err := inv.Get(ctx, wordHash); err != nil {
+			panic(err)
+		} else if v != nil {
+			ret = v.(map[string][]float32)	
+		}
+
+		out <- ret
+	}()
+	return out
+}
+
 func getFromInverted(ctx context.Context, termChan <-chan string, inv []db.DB) <-chan map[string]Rank_term {
-	out := make(chan map[string]Rank_term)
-	go func() {
-		for term := range termChan {
+	out := make(chan map[string]Rank_term, len(termChan))
+	defer close(out)
+	var wg sync.WaitGroup
+
+	for term := range termChan {
+		wg.Add(1)
+		go func(term string) {
+			defer wg.Done()
+
 			// get list of documents from both inverted tables
-			var titleResult, bodyResult map[string][]float32
-			if v, err := inv[0].Get(ctx, term); err != nil && err != badger.ErrKeyNotFound {
-				panic(err)
-			} else if v != nil {
-				titleResult = v.(map[string][]float32)
-			}
+			var bodyResult map[string][]float32
+			titleRes := getInvTitle(ctx, inv[0], term)
 
 			if v, err := inv[1].Get(ctx, term); err != nil && err != badger.ErrKeyNotFound {
 				panic(err)
@@ -159,7 +169,7 @@ func getFromInverted(ctx context.Context, termChan <-chan string, inv []db.DB) <
 				}
 			}
 
-			for docHash, listPos := range titleResult {
+			for docHash, listPos := range <-titleRes {
 				tempVal := ret[docHash]
 				// first entry of the listPos is norm_tf*idf
 				tempVal.TitleWeights = []float32{listPos[0]}
@@ -167,9 +177,10 @@ func getFromInverted(ctx context.Context, termChan <-chan string, inv []db.DB) <
 			}
 
 			out <- ret
-		}
-		close(out)
-	}()
+		}(term)
+	}
+
+	wg.Wait()
 	return out
 }
 
