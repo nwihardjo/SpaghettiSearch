@@ -72,7 +72,14 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 
 func extractWord (n *html.Node) []string{
 	var words []string
-	if n.Type == html.TextNode{
+	if n.Type == html.ElementNode {
+		tempD := n.Data
+		if !(tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav") {
+			for n.FirstChild != nil {
+				n.RemoveChild(n.FirstChild)
+			}
+		}
+	} else if n.Type == html.TextNode {
 		tempD := n.Parent.Data
 		cleaned := strings.TrimSpace(n.Data)
 		if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
