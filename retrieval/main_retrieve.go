@@ -17,6 +17,8 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	//---------------- QUERY PARSING ----------------//
 
 	// separate the phrase into variable phrases, and exclude them from the query
+	pureQuery := query
+
 	phrases := getPhrase(query)
 	for _, term := range phrases {
 		query = strings.Replace(query, "\""+string(term)+"\"", "", 1)
@@ -80,7 +82,7 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 0.8))
 	docsOutChan := [](<-chan Rank_combined){}
 	for i := 0; i < numFanOut; i++ {
-		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised)))
+		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised), pureQuery))
 	}
 
 	// fan-in final rank (generator pattern) and sort the result
@@ -128,7 +130,7 @@ func getInvTitle(ctx context.Context, inv db.DB, wordHash string) <-chan map[str
 	out := make(chan map[string][]float32, 1)
 	go func () {
 		var ret map[string][]float32
-		if v, err := inv.Get(ctx, wordHash); err != nil {
+		if v, err := inv.Get(ctx, wordHash); err != nil && err != badger.ErrKeyNotFound{
 			panic(err)
 		} else if v != nil {
 			ret = v.(map[string][]float32)	

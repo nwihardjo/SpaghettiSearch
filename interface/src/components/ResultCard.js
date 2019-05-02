@@ -21,7 +21,6 @@ class ResultCard extends Component {
   }
   componentDidMount (props) {
     // extract only the date
-    console.log(this.props.data)
     var date=this.props.data['Mod_date'].match(/(\d{4})-(\d{2})-(\d{2})/)
     this.setState({Url: this.props.data['Url'],
                   Mod_date: date[0],
@@ -35,7 +34,6 @@ class ResultCard extends Component {
                   Summary: this.props.data['Summary']});
   }
   renderParent = () => {
-    console.log(this.state.Parents)
     if(this.state.Parents.length > 0) {
       return(
         <div>
@@ -73,7 +71,7 @@ class ResultCard extends Component {
       <Card className='custom'>
         <CardBody>
           <CardLink className='title' href={this.state.Url}> {this.state.Page_title} </CardLink>
-          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}</small>
+          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}%</small>
           <CardSubtitle><CardLink className='subtitle' href={this.state.Url}> {this.state.Url} </CardLink></CardSubtitle>
           <div className='row'>
           {Object.entries(this.state.Words_mapping).sort((a, b) => {
