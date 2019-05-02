@@ -105,7 +105,7 @@ class ResultCard extends Component {
       <Card className='custom'>
         <CardBody>
           <CardLink className='title' href={this.state.Url}> {this.state.Page_title} </CardLink>
-          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}</small>
+          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}%</small>
           <CardSubtitle><CardLink className='subtitle' href={this.state.Url}> {this.state.Url} </CardLink></CardSubtitle>
           <div className='row'>
           {Object.entries(this.state.Words_mapping).sort((a, b) => {

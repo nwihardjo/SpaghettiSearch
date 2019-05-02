@@ -17,7 +17,6 @@ class Results extends Component {
 
   getResults = (query) => {
     this.setState({results: []});
-    console.log("Results received query: ", query)
     axios({
       method: 'post',
       url: config.address+'query',
@@ -35,7 +34,6 @@ class Results extends Component {
       this.setState({query: query, results: filtered});
     })
     .catch((error) => {
-      console.log(error);
     });
   }
   render() {

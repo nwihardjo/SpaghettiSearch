@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/dgraph-io/badger"
 	"math"
+	"sync"
 	db "the-SearchEngine/database"
 )
 
@@ -15,14 +16,14 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 		phraseInChan := genPhrasePipeline(phraseTokenised)
 
 		// fan-out to get term occurence from inverted tables
-		numFanOut := int(math.Ceil(float64(len(phraseTokenised)) * 0.75))
+		numFanOut := int(math.Ceil(float64(len(phraseTokenised)) * 0.8))
 		termOutChan := [](<-chan map[string]Rank_term){}
 		for i := 0; i < numFanOut; i++ {
 			termOutChan = append(termOutChan, getPosTerm(ctx, phraseInChan, inv))
 		}
 
-		// fan-in the docs, and group the weights based on the phrase's term position
-		aggregatedResult := make(map[string](map[uint8]Rank_term))
+		// fan-in the docs, and group the weights based on the phrase's term position 
+		aggregatedResult := make(map[string](map[uint8]Rank_term)) 
 		for docsMatched := range fanInDocs(termOutChan) {
 			// below iterate through a map[string]Rank_term
 			for docHash, ranks := range docsMatched {
@@ -117,16 +118,18 @@ func genPhrasePipeline(listStr []string) <-chan termPhrase {
 }
 
 func getPosTerm(ctx context.Context, termChan <-chan termPhrase, inv []db.DB) <-chan map[string]Rank_term {
-	out := make(chan map[string]Rank_term)
-	go func() {
-		for term := range termChan {
+	out := make(chan map[string]Rank_term, len(termChan))
+	defer close(out)
+	var wg sync.WaitGroup
+
+	for term := range termChan {
+		wg.Add(1)
+		go func(term termPhrase) {
+			defer wg.Done()
+
 			// get list of documents from both inverted tables
-			var titleResult, bodyResult map[string][]float32
-			if v, err := inv[0].Get(ctx, term.Term); err != nil && err != badger.ErrKeyNotFound {
-				panic(err)
-			} else if v != nil {
-				titleResult = v.(map[string][]float32)
-			}
+			var bodyResult map[string][]float32
+			titleRes := getInvTitle(ctx, inv[0], term.Term)
 
 			if v, err := inv[1].Get(ctx, term.Term); err != nil && err != badger.ErrKeyNotFound {
 				panic(err)
@@ -148,7 +151,7 @@ func getPosTerm(ctx context.Context, termChan <-chan termPhrase, inv []db.DB) <-
 				}
 			}
 
-			for docHash, listPos := range titleResult {
+			for docHash, listPos := range <- titleRes {
 				// first entry is norm_tf*idf, no need to be subtracted
 				for i := 1; i < len(listPos); i++ {
 					listPos[i] -= float32(term.Pos)
@@ -160,8 +163,8 @@ func getPosTerm(ctx context.Context, termChan <-chan termPhrase, inv []db.DB) <-
 			}
 
 			out <- ret
-		}
-		close(out)
-	}()
+		}(term)
+	}
+	wg.Wait()
 	return out
 }

@@ -8,13 +8,16 @@ import (
 	"io/ioutil"
 	db "the-SearchEngine/database"
 	"strings"
+	"regexp"
 	"golang.org/x/net/html"
 	"the-SearchEngine/indexer"
 )
 
-func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int) <-chan Rank_combined {
+func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int, query string) <-chan Rank_combined {
 	out := make(chan Rank_combined, len(docs))
+	defer close(out)
 	var wg sync.WaitGroup
+
 	for doc := range docs {
 		wg.Add(1)
 		go func(doc Rank_result) {
@@ -22,7 +25,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 
 			// get doc metadata using future pattern for faster performance
 			metadata := getDocInfo(ctx, doc.DocHash, forw)
-			summary := getSummary(doc.DocHash)
+			summary := getSummary(doc.DocHash, query)
 
 			// get pagerank value
 			var PR float64
@@ -44,33 +47,51 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			queryMagnitude := math.Sqrt(float64(queryLength))
 
 			docMetaData := <-metadata
+			
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
+
+			// make rank to be 0 if division by zero occurs because it hasn't been indexed
 			if math.IsNaN(doc.BodyRank) {
 				doc.BodyRank = 0
 			}
 			if math.IsNaN(doc.TitleRank) {
 				doc.TitleRank = 0
 			}
-			if math.IsNaN(PR) {
-				PR = 0
-			}
 
 			docMetaData.PageRank = PR
-			docMetaData.FinalRank = 0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank
+			docMetaData.FinalRank = (0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank)*100.0
 			docMetaData.Summary = <-summary
 
 			out <- docMetaData
 		}(doc)
 	}
 	wg.Wait()
-	close(out)
 	return out
 }
 
-func getSummary(docHash string)  <-chan string{
+func extractWord (n *html.Node) []string{
+	var words []string
+	if n.Type == html.TextNode{ 
+		tempD := n.Parent.Data
+		cleaned := strings.TrimSpace(n.Data)
+		if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
+			words = append(words, cleaned)
+		}
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		extractWord(c)
+	}
+
+	return words
+}
+
+	
+func getSummary(docHash, query string)  <-chan string{
 	out := make(chan string, 1)
 	go func() {
+		queryTokenised := strings.Fields(strings.Replace(strings.ToLower(query), "\"", "", -1))	
+
 		// read cached files
 		htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
 		if err != nil  {
@@ -80,7 +101,7 @@ func getSummary(docHash string)  <-chan string{
 			if err != nil {
 				panic(err)
 			}
-			
+
 			// extract text from html body
 			var words []string
 			var extractWord func(*html.Node)
@@ -96,11 +117,62 @@ func getSummary(docHash string)  <-chan string{
 					extractWord(c)
 				}
 			}
-			extractWord(doc)
-			
+			extractWord(doc)	
+
 			// pre-process words extracted
 			words = strings.Fields(strings.Join(words, " "))
+
+			// dynamic summary, if first query present in the database
+			reg, err := regexp.Compile("[^a-zA-Z0-9]+")
+
+			for i := 0; i < len(words); i++ {
+				wordCleaned := strings.ToLower(reg.ReplaceAllString(words[i], ""))
+				isMatch := false
+				for i := 0; i < len(queryTokenised); i++ {
+					if wordCleaned == queryTokenised[i] {
+						isMatch = true
+					}
+				}
+
+				if isMatch {
+					temp := make([]string, 0, 20)
+					diff := 0
+
+					if (i-10) < 0 {
+						diff = 20 - i
+						temp = append(temp, words[:i]...)
+					} else {
+						temp = append(temp, "...")
+						temp = append(temp, words[i-10:i]...)
+					}
+					
+					if diff == 0 {
+						if (i+10) <= len(words) {
+							temp = append(temp, words[i:i+10]...)
+							temp = append(temp, "...")
+							out <- strings.Join(temp, " ")
+							return
+						} else {
+							temp = append(temp, words[i:]...)
+							out <- strings.Join(temp, " ")
+							return
+						}
+					} else {
+						if (i+diff) <= len(words) {
+							temp = append(temp, words[i:i+diff]...)
+							temp = append(temp, "...")
+							out <- strings.Join(temp, " ")
+							return
+						} else {
+							temp = append(temp, words[i:]...)
+							out <- strings.Join(temp, " ")
+							return
+						}
+					}
+				}
+			}
 			
+			// static summary
 			if len(words) > 21 {
 				var temp []string
 				i := int(math.Ceil(float64(len(words)) / 2.0))
@@ -175,9 +247,15 @@ func convertHashDocinfo(ctx context.Context, docHashes []string, forw []db.DB) <
 }
 
 func retrieveUrl(ctx context.Context, docHashIn <-chan string, forw []db.DB) <-chan string {
-	out := make(chan string, 1)
-	go func() {
-		for docHash := range docHashIn {
+	out := make(chan string, len(docHashIn))
+	defer close(out)
+	var wg sync.WaitGroup
+	
+	for docHash := range docHashIn {
+		wg.Add(1)
+		go func(docHash string) {
+			defer wg.Done()
+
 			var url string
 			if val, err := forw[1].Get(ctx, docHash); err != nil {
 				panic(err)
@@ -187,10 +265,10 @@ func retrieveUrl(ctx context.Context, docHashIn <-chan string, forw []db.DB) <-c
 			}
 
 			out <- url
-		}
-		close(out)
-	}()
+		}(docHash)
+	}
 
+	wg.Wait()
 	return out
 }
 
@@ -254,9 +332,15 @@ func fanInWords(wordIn []<-chan map[string]string) <-chan map[string]string {
 }
 
 func retrieveWord(ctx context.Context, wordInChan <-chan string, forw []db.DB) <-chan map[string]string {
-	out := make(chan map[string]string, 1)
-	go func() {
-		for word := range wordInChan {
+	out := make(chan map[string]string, len(wordInChan))
+	defer close(out)
+	var wg sync.WaitGroup
+
+	for word := range wordInChan {
+		wg.Add(1)
+		go func(word string) {
+			defer wg.Done()
+	
 			var wordStr string
 			if val, err := forw[0].Get(ctx, word); err != nil {
 				panic(err)
@@ -265,10 +349,10 @@ func retrieveWord(ctx context.Context, wordInChan <-chan string, forw []db.DB) <
 			}
 
 			out <- map[string]string{word: wordStr}
-		}
-		close(out)
-	}()
+		}(word)
+	}
 
+	wg.Wait()
 	return out
 }
 
