@@ -156,8 +156,8 @@ func main() {
 	// perform database update
 	timer := time.Now()
 	ranking.UpdatePagerank(ctx, 0.85, 1e-20, forw)
-	ranking.UpdateTermWeights(ctx, &inv[0], &forw[4], "title")
-	ranking.UpdateTermWeights(ctx, &inv[1], &forw[4], "body")
+	ranking.UpdateTermWeights(ctx, &inv[0], forw, "title")
+	ranking.UpdateTermWeights(ctx, &inv[1], forw, "body")
 
 	//inv[1].Debug_Print(ctx)
 	fmt.Println("Updating pagerank and idf takes", time.Since(timer))

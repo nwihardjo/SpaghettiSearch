@@ -3,19 +3,17 @@ package ranking
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"math"
 	db "the-SearchEngine/database"
-	"the-SearchEngine/indexer"
 )
 
-func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string) {
-	// calculate number of webpages indexed based on saved html
+func UpdateTermWeights(ctx context.Context, inv *db.DB, forw []db.DB, info string) {
+	// calculate number of document in the database
 	var totalDocs float64
-	if cachedWebpages, err := ioutil.ReadDir(indexer.DocsDir); err != nil {
+	if nodesCompressed, err := forw[3].Iterate(ctx); err != nil {
 		panic(err)
 	} else {
-		totalDocs = float64(len(cachedWebpages))
+		totalDocs = float64(len(nodesCompressed.KV))
 	}
 
 	bw := (*inv).BatchWrite_init(ctx)
@@ -54,8 +52,8 @@ func UpdateTermWeights(ctx context.Context, inv *db.DB, forw *db.DB, info string
 		panic(err)
 	}
 
-	// save page magnitude to forw[3]
-	saveMagnitude(ctx, pageMagnitude, forw, info)
+	// save page magnitude to forw[4]
+	saveMagnitude(ctx, pageMagnitude, &forw[4], info)
 }
 
 func saveMagnitude(ctx context.Context, pageMagnitude map[string]float64, forw *db.DB, info string) {

@@ -17,11 +17,11 @@ class ResultCard extends Component {
     Words_mapping:{},
     PageRank: 0,
     FinalRank: 0,
-    Summary: ""}
+    Summary: "",
+		Term: [],}
   }
   componentDidMount (props) {
     // extract only the date
-    console.log(this.props.data)
     var date=this.props.data['Mod_date'].match(/(\d{4})-(\d{2})-(\d{2})/)
     this.setState({Url: this.props.data['Url'],
                   Mod_date: date[0],
@@ -32,10 +32,10 @@ class ResultCard extends Component {
                   Words_mapping: ((this.props.data['Words_mapping']!=null)?this.props.data['Words_mapping']:{}),
                   PageRank: this.props.data['PageRank'],
                   FinalRank: this.props.data['FinalRank'],
-                  Summary: this.props.data['Summary']});
+                  Summary: this.props.data['Summary'],
+									Term: this.props.terms});
   }
   renderParent = () => {
-    console.log(this.state.Parents)
     if(this.state.Parents.length > 0) {
       return(
         <div>
@@ -67,13 +67,41 @@ class ResultCard extends Component {
       return <div></div>;
     }
   }
+	renderSummary = () => {
+		var summaryArr = [];
+		let idxs = [];
+		for(let i in this.state.Term) {
+			let idx = this.state.Summary.toLowerCase().indexOf(this.state.Term[i].toLowerCase());
+			if(idx !== -1) {
+				idxs.push([i, idx]);
+			}
+		}
+		if(idxs.length === 0) {
+			return <div>{this.state.Summary}</div>;
+		} else {
+			let sortedIdxs = idxs.sort(function(a, b) {
+				return a[1] - b[1];
+			});
+			summaryArr.push(<span>{this.state.Summary.slice(0, sortedIdxs[0][1])}</span>);
+			for(let x in sortedIdxs) {
+						summaryArr.push(<b>{this.state.Summary.slice(sortedIdxs[x][1],
+							sortedIdxs[x][1]+this.state.Term[sortedIdxs[x][0]].length)}</b>);
+						if(sortedIdxs.length - 1 === Number(x)) {
+							summaryArr.push(<span>{this.state.Summary.slice(sortedIdxs[x][1]+this.state.Term[sortedIdxs[x][0]].length)}</span>);
+						} else {
+							summaryArr.push(<span>{this.state.Summary.slice(sortedIdxs[x][1]+this.state.Term[sortedIdxs[x][0]].length, sortedIdxs[Number(x)+1][1])}</span>);
+						}
+			}
+		}
+		return summaryArr;
+	}
   render() {
     return (
       <a className='card-link--nostyle' href={this.state.Url}>
       <Card className='custom'>
         <CardBody>
           <CardLink className='title' href={this.state.Url}> {this.state.Page_title} </CardLink>
-          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}</small>
+          <small className="text-muted"><span>&#8729;</span> {Math.round(this.state.FinalRank*100)/100}%</small>
           <CardSubtitle><CardLink className='subtitle' href={this.state.Url}> {this.state.Url} </CardLink></CardSubtitle>
           <div className='row'>
           {Object.entries(this.state.Words_mapping).sort((a, b) => {
@@ -83,7 +111,7 @@ class ResultCard extends Component {
         </CardBody>
         <CardBody>
           <CardText>
-          {this.state.Summary} <br/>
+          {this.renderSummary()} <br/>
           <small className="text-muted">
           {this.renderParent()}
           {this.renderChildren()}
