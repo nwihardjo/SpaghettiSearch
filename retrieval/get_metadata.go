@@ -13,7 +13,7 @@ import (
 	"the-SearchEngine/indexer"
 )
 
-func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int, query string) <-chan Rank_combined {
+func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int, query string, phrases []string) <-chan Rank_combined {
 	out := make(chan Rank_combined, len(docs))
 	defer close(out)
 	var wg sync.WaitGroup
@@ -25,7 +25,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 
 			// get doc metadata using future pattern for faster performance
 			metadata := getDocInfo(ctx, doc.DocHash, forw)
-			summary := getSummary(doc.DocHash, query)
+			summary := getSummary(doc.DocHash, query, phrases)
 
 			// get pagerank value
 			var PR float64
@@ -47,7 +47,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			queryMagnitude := math.Sqrt(float64(queryLength))
 
 			docMetaData := <-metadata
-			
+
 			doc.BodyRank /= (pageMagnitude["body"] * queryMagnitude)
 			doc.TitleRank /= (pageMagnitude["title"] * queryMagnitude)
 
@@ -72,7 +72,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 
 func extractWord (n *html.Node) []string{
 	var words []string
-	if n.Type == html.TextNode{ 
+	if n.Type == html.TextNode{
 		tempD := n.Parent.Data
 		cleaned := strings.TrimSpace(n.Data)
 		if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
@@ -86,11 +86,11 @@ func extractWord (n *html.Node) []string{
 	return words
 }
 
-	
-func getSummary(docHash, query string)  <-chan string{
+
+func getSummary(docHash, query string, phrases []string)  <-chan string{
 	out := make(chan string, 1)
 	go func() {
-		queryTokenised := strings.Fields(strings.Replace(strings.ToLower(query), "\"", "", -1))	
+		queryTokenised := strings.Fields(strings.Replace(strings.ToLower(query), "\"", "", -1))
 
 		// read cached files
 		htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
@@ -106,7 +106,14 @@ func getSummary(docHash, query string)  <-chan string{
 			var words []string
 			var extractWord func(*html.Node)
 			extractWord = func(n *html.Node) {
-				if n.Type == html.TextNode{
+				if n.Type == html.ElementNode {
+					tempD := n.Data
+					if !(tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav") {
+						for n.FirstChild != nil {
+							n.RemoveChild(n.FirstChild)
+						}
+					}
+				} else if n.Type == html.TextNode {
 					tempD := n.Parent.Data
 					cleaned := strings.TrimSpace(n.Data)
 					if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
@@ -117,7 +124,7 @@ func getSummary(docHash, query string)  <-chan string{
 					extractWord(c)
 				}
 			}
-			extractWord(doc)	
+			extractWord(doc)
 
 			// pre-process words extracted
 			words = strings.Fields(strings.Join(words, " "))
@@ -128,9 +135,32 @@ func getSummary(docHash, query string)  <-chan string{
 			for i := 0; i < len(words); i++ {
 				wordCleaned := strings.ToLower(reg.ReplaceAllString(words[i], ""))
 				isMatch := false
-				for i := 0; i < len(queryTokenised); i++ {
-					if wordCleaned == queryTokenised[i] {
+				for j := 0; j < len(phrases); j++ {
+					tempPhrase := strings.Fields(phrases[j])
+					allMatch := true
+					for k := 0; k < len(tempPhrase); k++ {
+						word2 := strings.ToLower(reg.ReplaceAllString(tempPhrase[k], ""))
+						if i+k >= len(words) {
+							allMatch = false
+							break
+						}
+						wordCleaned2 := strings.ToLower(reg.ReplaceAllString(words[i+k], ""))
+						if wordCleaned2 != word2 {
+							allMatch = false
+							break
+						}
+					}
+					if allMatch {
 						isMatch = true
+						break
+					}
+				}
+				if !isMatch {
+					for j := 0; j < len(queryTokenised); j++ {
+						if wordCleaned == strings.ToLower(reg.ReplaceAllString(queryTokenised[j], "")) {
+							isMatch = true
+							break
+						}
 					}
 				}
 
@@ -145,7 +175,7 @@ func getSummary(docHash, query string)  <-chan string{
 						temp = append(temp, "...")
 						temp = append(temp, words[i-10:i]...)
 					}
-					
+
 					if diff == 0 {
 						if (i+10) <= len(words) {
 							temp = append(temp, words[i:i+10]...)
@@ -171,7 +201,7 @@ func getSummary(docHash, query string)  <-chan string{
 					}
 				}
 			}
-			
+
 			// static summary
 			if len(words) > 21 {
 				var temp []string

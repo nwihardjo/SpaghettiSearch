@@ -17,7 +17,7 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	//---------------- QUERY PARSING ----------------//
 
 	// separate the phrase into variable phrases, and exclude them from the query
-	pureQuery := query
+	// pureQuery := query
 
 	phrases := getPhrase(query)
 	for _, term := range phrases {
@@ -82,7 +82,7 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 0.8))
 	docsOutChan := [](<-chan Rank_combined){}
 	for i := 0; i < numFanOut; i++ {
-		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised), pureQuery))
+		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised), query, phrases))
 	}
 
 	// fan-in final rank (generator pattern) and sort the result

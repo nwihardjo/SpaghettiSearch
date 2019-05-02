@@ -33,8 +33,7 @@ class ResultCard extends Component {
                   PageRank: this.props.data['PageRank'],
                   FinalRank: this.props.data['FinalRank'],
                   Summary: this.props.data['Summary'],
-									Term: this.props.term});
-		console.log(this.state.Term);
+									Term: this.props.terms});
   }
   renderParent = () => {
     if(this.state.Parents.length > 0) {
@@ -71,13 +70,11 @@ class ResultCard extends Component {
 	renderSummary = () => {
 		var summaryArr = [];
 		let idxs = [];
-		let x = 0;
-		for(let i in this.State.Term) {
-			let idx = this.state.Summary.indexOf(i);
+		for(let i in this.state.Term) {
+			let idx = this.state.Summary.toLowerCase().indexOf(this.state.Term[i].toLowerCase());
 			if(idx !== -1) {
-				idxs.push([x, idx]);
+				idxs.push([i, idx]);
 			}
-			x++;
 		}
 		if(idxs.length === 0) {
 			return <div>{this.state.Summary}</div>;
@@ -86,15 +83,14 @@ class ResultCard extends Component {
 				return a[1] - b[1];
 			});
 			summaryArr.push(<span>{this.state.Summary.slice(0, sortedIdxs[0][1])}</span>);
-			let i = 0;
 			for(let x in sortedIdxs) {
-						summaryArr.push(<b>{this.state.Summary.slice(x[1], x[1]+this.state.Term[x[0]].length)}</b>);
-						if(sortedIdxs.length - 1 === i) {
-							summaryArr.push(<span>{this.state.Summary.slice(x[1]+this.state.Term[x[0]].length)}</span>);
+						summaryArr.push(<b>{this.state.Summary.slice(sortedIdxs[x][1],
+							sortedIdxs[x][1]+this.state.Term[sortedIdxs[x][0]].length)}</b>);
+						if(sortedIdxs.length - 1 === Number(x)) {
+							summaryArr.push(<span>{this.state.Summary.slice(sortedIdxs[x][1]+this.state.Term[sortedIdxs[x][0]].length)}</span>);
 						} else {
-							summaryArr.push(<span>{this.state.Summary.slice(x[1]+this.state.Term[x[0]].length, sortedIdxs[i+1][1])}</span>);
+							summaryArr.push(<span>{this.state.Summary.slice(sortedIdxs[x][1]+this.state.Term[sortedIdxs[x][0]].length, sortedIdxs[Number(x)+1][1])}</span>);
 						}
-						i++;
 			}
 		}
 		return summaryArr;
