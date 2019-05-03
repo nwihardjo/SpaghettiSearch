@@ -16,7 +16,7 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 		phraseInChan := genPhrasePipeline(phraseTokenised)
 
 		// fan-out to get term occurence from inverted tables
-		numFanOut := int(math.Ceil(float64(len(phraseTokenised)) * 0.8))
+		numFanOut := int(math.Ceil(float64(len(phraseTokenised)) * 1.0))
 		termOutChan := [](<-chan map[string]Rank_term){}
 		for i := 0; i < numFanOut; i++ {
 			termOutChan = append(termOutChan, getPosTerm(ctx, phraseInChan, inv))

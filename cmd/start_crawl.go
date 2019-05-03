@@ -39,7 +39,7 @@ func main() {
 
 	startURL := "https://www.cse.ust.hk"
 	numOfPages := 500
-	maxThreadNum := 100
+	maxThreadNum := 300
 	sem := semaphore.NewWeighted(int64(maxThreadNum))
 	domain := "cse.ust.hk"
 	visited := make(map[URLHash]bool)

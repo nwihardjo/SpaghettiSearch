@@ -17,7 +17,6 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	//---------------- QUERY PARSING ----------------//
 
 	// separate the phrase into variable phrases, and exclude them from the query
-	// pureQuery := query
 
 	phrases := getPhrase(query)
 	for _, term := range phrases {
@@ -48,7 +47,7 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	termInChan := genTermPipeline(queryTokenised)
 
 	// fan-out to get term occurence from inverted tables
-	numFanOut := int(math.Ceil(float64(len(queryTokenised)) * 0.8))
+	numFanOut := int(math.Ceil(float64(len(queryTokenised)) * 1.0))
 	termOutChan := [](<-chan map[string]Rank_term){}
 	for i := 0; i < numFanOut; i++ {
 		termOutChan = append(termOutChan, getFromInverted(ctx, termInChan, inv))
@@ -79,7 +78,7 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	docsInChan := genAggrDocsPipeline(aggregatedDocs)
 
 	// fan-out to calculate final rank from PR and page magnitude
-	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 0.8))
+	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 1.0))
 	docsOutChan := [](<-chan Rank_combined){}
 	for i := 0; i < numFanOut; i++ {
 		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised), query, phrases))
