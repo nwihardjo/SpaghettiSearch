@@ -50,4 +50,3 @@ func (bwb *BadgerBatchWriter) BatchSet(ctx context.Context, key_ interface{}, va
 	}
 	return nil
 }
-

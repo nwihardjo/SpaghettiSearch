@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/dgraph-io/badger"
+	"github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/nwihardjo/SpaghettiSearch/parser"
 	"golang.org/x/net/html"
 	"io/ioutil"
 	"net/url"
@@ -13,8 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"the-SearchEngine/database"
-	"the-SearchEngine/parser"
 	"time"
 )
 
@@ -58,7 +58,6 @@ func Index(doc []byte, rootNode *html.Node, urlString string,
 			}
 		} else {
 			// no need to update
-			fmt.Println("\n\n[DEBUG] NO UPDATE NEEDED\n\n")
 			mutex.Unlock()
 			return
 		}
@@ -75,7 +74,6 @@ func Index(doc []byte, rootNode *html.Node, urlString string,
 	if checkIndex {
 		checkAndUpdate(mutex, docHashString, dI, &checkIndex, doc, inverted, forward)
 	}
-
 
 	// title and body are structs
 	titleInfo, bodyInfo, fancyInfo, cleanFancy := parser.Parse(rootNode, urlString)
@@ -117,7 +115,6 @@ func Index(doc []byte, rootNode *html.Node, urlString string,
 		kids = append(kids, childHashString)
 		kidUrls = append(kidUrls, childURL)
 	}
-
 
 	// initiate batch object
 	var batchWriter_forward []database.BatchWriter
@@ -350,7 +347,6 @@ func Index(doc []byte, rootNode *html.Node, urlString string,
 	}
 }
 
-
 func setInverted(ctx context.Context, pos map[string][]float32, maxFreq uint32, docHash string,
 	forward []database.DB, inverted database.DB, bw_forward []database.BatchWriter, bw_inverted database.BatchWriter) {
 
@@ -424,9 +420,8 @@ func getMaxFreq(in map[string]uint32) (ret uint32) {
 func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo, checkIndex *bool,
 	doc []byte, inverted []database.DB, forward []database.DB) {
 
-	cacheFileD, e := ioutil.ReadFile(DocsDir+docHashString)
+	cacheFileD, e := ioutil.ReadFile(DocsDir + docHashString)
 	if e != nil {
-		fmt.Println("\n--DEBUG--")
 		fmt.Println(e)
 		*checkIndex = false
 	} else {
@@ -450,7 +445,7 @@ func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo
 			}
 
 			type DocPosHashStruct struct {
-				DocPos map[string][]float32
+				DocPos   map[string][]float32
 				WordHash string
 			}
 			tempPageTitle := parser.Laundry(strings.Join(dI.Page_title, " "))
@@ -465,7 +460,6 @@ func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo
 					defer wgGet.Done()
 					docP_, e := inverted[0].Get(ctx, hS)
 					if e != nil {
-						fmt.Println("\n---DEBUG---")
 						fmt.Println(e)
 						wordChann <- DocPosHashStruct{nil, ""}
 					} else {
@@ -504,7 +498,6 @@ func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo
 					defer wgGet.Done()
 					docP_, e := inverted[1].Get(ctx, whS)
 					if e != nil {
-						fmt.Println("\n---DEBUG---")
 						fmt.Println(e)
 						wordChann <- DocPosHashStruct{nil, ""}
 					} else {
@@ -537,7 +530,7 @@ func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo
 			}
 
 			type DocInfoChildStruct struct {
-				DocInfo database.DocInfo
+				DocInfo   database.DocInfo
 				ChildHash string
 			}
 			newChann := make(chan DocInfoChildStruct, len(dI.Children))
@@ -557,8 +550,8 @@ func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo
 			wgGet.Wait()
 			close(newChann)
 			type DocPosHashChildStruct struct {
-				DocPos map[string][]float32
-				WordHash string
+				DocPos    map[string][]float32
+				WordHash  string
 				ChildHash string
 			}
 			arrOfChann := make([]chan DocPosHashChildStruct, len(dI.Children))
@@ -642,7 +635,6 @@ func checkAndUpdate(mutex *sync.Mutex, docHashString string, dI database.DocInfo
 		} else {
 			// If the doc exists and there is no changes, return
 			// no need to update
-			fmt.Println("\n\n[DEBUG 2] NO UPDATE NEEDED\n\n")
 			return
 		}
 	}

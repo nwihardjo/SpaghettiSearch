@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/eapache/channels"
+	"github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/nwihardjo/SpaghettiSearch/indexer"
 	"golang.org/x/net/html"
 	"golang.org/x/sync/semaphore"
 	"io/ioutil"
@@ -13,8 +15,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"the-SearchEngine/database"
-	"the-SearchEngine/indexer"
 	"time"
 )
 

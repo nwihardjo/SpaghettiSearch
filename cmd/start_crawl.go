@@ -4,24 +4,30 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/eapache/channels"
+	"github.com/nwihardjo/SpaghettiSearch/crawler"
+	"github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/nwihardjo/SpaghettiSearch/ranking"
 	"golang.org/x/sync/semaphore"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"sync"
-	"the-SearchEngine/crawler"
-	"the-SearchEngine/database"
-	"the-SearchEngine/ranking"
 	"time"
 )
 
 type URLHash [16]byte
 
 func main() {
+	numOfPages := flag.Int("numPages", 300, "-numPages=<number_of_pages_crawled>")
+	startURL := flag.String("startURL", "https://www.cse.ust.hk", "-startURL=<crawler_entry_point>")
+	domainOnly := flag.Bool("domainOnly", true, "-domainOnly=<crawl_only_domain_given_domain_or_not>")
+	flag.Parse()
+
 	fmt.Println("Crawler started...")
 
 	start := time.Now()
@@ -34,14 +40,18 @@ func main() {
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout: td,
+		Timeout:   td,
 	}
 
-	startURL := "https://www.cse.ust.hk"
-	numOfPages := 500
+	var domain string
+	if temp, err := url.Parse(*startURL); err != nil {
+		panic(err)
+	} else {
+		domain = temp.Hostname()
+	}
+
 	maxThreadNum := 300
 	sem := semaphore.NewWeighted(int64(maxThreadNum))
-	domain := "cse.ust.hk"
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
 	errorsChannel := channels.NewInfiniteChannel()
@@ -58,14 +68,14 @@ func main() {
 		defer bdb.Close(ctx, cancel)
 	}
 
-	queue.In() <- []string{"", startURL}
+	queue.In() <- []string{"", *startURL}
 
 	depth := 0
 	nextDepthSize := 1
 	fmt.Println("Depth:", depth, "- Queued:", nextDepthSize)
 
-	for len(visited) < numOfPages {
-		for queue.Len() > 0 && len(visited) < numOfPages && nextDepthSize > 0 {
+	for len(visited) < *numOfPages {
+		for queue.Len() > 0 && len(visited) < *numOfPages && nextDepthSize > 0 {
 			if edge, ok := (<-queue.Out()).([]string); ok {
 
 				nextDepthSize -= 1
@@ -87,7 +97,7 @@ func main() {
 				if e != nil {
 					panic(e)
 				}
-				if !strings.HasSuffix(u.Hostname(), domain) {
+				if !strings.HasSuffix(u.Hostname(), domain) && *domainOnly {
 					continue
 				}
 
@@ -123,7 +133,7 @@ func main() {
 		*/
 		for errorsChannel.Len() > 0 {
 			if _, ok := (<-errorsChannel.Out()).(string); ok {
-				numOfPages += 1
+				*numOfPages += 1
 			} else {
 				os.Exit(1)
 			}
@@ -139,7 +149,6 @@ func main() {
 		}
 
 		if queue.Len() <= 0 {
-			fmt.Println("\n\n[DEBUG] QUEUE EMPTY\n\n")
 			break
 		}
 
@@ -161,5 +170,5 @@ func main() {
 
 	//inv[1].Debug_Print(ctx)
 	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
-	fmt.Println("\nTotal elapsed time: " ,time.Now().Sub(start).String())
+	fmt.Println("\nTotal elapsed time: ", time.Now().Sub(start).String())
 }

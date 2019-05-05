@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/apsdehal/go-logger"
-	"the-SearchEngine/database"
+	"github.com/nwihardjo/SpaghettiSearch/database"
 )
 
 func main() {

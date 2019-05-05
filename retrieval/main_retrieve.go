@@ -5,11 +5,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/dgraph-io/badger"
+	db "github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/nwihardjo/SpaghettiSearch/parser"
 	"math"
 	"strings"
 	"sync"
-	db "the-SearchEngine/database"
-	"the-SearchEngine/parser"
 )
 
 func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Rank_combined {
@@ -127,12 +127,12 @@ func genAggrDocsPipeline(docRank map[string]Rank_term) <-chan Rank_result {
 
 func getInvTitle(ctx context.Context, inv db.DB, wordHash string) <-chan map[string][]float32 {
 	out := make(chan map[string][]float32, 1)
-	go func () {
+	go func() {
 		var ret map[string][]float32
-		if v, err := inv.Get(ctx, wordHash); err != nil && err != badger.ErrKeyNotFound{
+		if v, err := inv.Get(ctx, wordHash); err != nil && err != badger.ErrKeyNotFound {
 			panic(err)
 		} else if v != nil {
-			ret = v.(map[string][]float32)	
+			ret = v.(map[string][]float32)
 		}
 
 		out <- ret

@@ -3,9 +3,9 @@ package retrieval
 import (
 	"context"
 	"github.com/dgraph-io/badger"
+	db "github.com/nwihardjo/SpaghettiSearch/database"
 	"math"
 	"sync"
-	db "the-SearchEngine/database"
 )
 
 func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []db.DB) <-chan map[string]Rank_term {
@@ -22,8 +22,8 @@ func getPhraseFromInverted(ctx context.Context, phraseTokenised []string, inv []
 			termOutChan = append(termOutChan, getPosTerm(ctx, phraseInChan, inv))
 		}
 
-		// fan-in the docs, and group the weights based on the phrase's term position 
-		aggregatedResult := make(map[string](map[uint8]Rank_term)) 
+		// fan-in the docs, and group the weights based on the phrase's term position
+		aggregatedResult := make(map[string](map[uint8]Rank_term))
 		for docsMatched := range fanInDocs(termOutChan) {
 			// below iterate through a map[string]Rank_term
 			for docHash, ranks := range docsMatched {
@@ -151,7 +151,7 @@ func getPosTerm(ctx context.Context, termChan <-chan termPhrase, inv []db.DB) <-
 				}
 			}
 
-			for docHash, listPos := range <- titleRes {
+			for docHash, listPos := range <-titleRes {
 				// first entry is norm_tf*idf, no need to be subtracted
 				for i := 1; i < len(listPos); i++ {
 					listPos[i] -= float32(term.Pos)

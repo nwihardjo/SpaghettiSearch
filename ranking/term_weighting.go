@@ -3,8 +3,8 @@ package ranking
 import (
 	"context"
 	"encoding/json"
+	db "github.com/nwihardjo/SpaghettiSearch/database"
 	"math"
-	db "the-SearchEngine/database"
 )
 
 func UpdateTermWeights(ctx context.Context, inv *db.DB, forw []db.DB, info string) {

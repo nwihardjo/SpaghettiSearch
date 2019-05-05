@@ -4,18 +4,18 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"github.com/apsdehal/go-logger"
+	"github.com/deckarep/golang-set"
+	"github.com/juliangruber/go-intersect"
+	"github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/thoas/go-funk"
 	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
 	"testing"
-	"the-SearchEngine/database"
 	"time"
-	"fmt"
-	"github.com/deckarep/golang-set"
-	"github.com/juliangruber/go-intersect"
-	"github.com/thoas/go-funk"
 )
 
 var ctx context.Context
@@ -85,8 +85,6 @@ func BenchmarkGet200Children200Words(b *testing.B) {
 	}
 }
 
-	
-
 func BenchmarkSetWord(b *testing.B) {
 	word := "new_word"
 	hashedW := md5.Sum([]byte(word))
@@ -120,11 +118,11 @@ func Benchmark_golangset(b *testing.B) {
 	}
 	for _, i := range slice2 {
 		s2.Add(i)
-	} 
+	}
 	for _, i := range slice3 {
 		s3.Add(i)
 	}
-	
+
 	b.ResetTimer()
 	temp := s1.Intersect(s2)
 	temp = temp.Intersect(s3)
@@ -137,7 +135,6 @@ func Benchmark_gofunc(b *testing.B) {
 	fmt.Println(temp)
 }
 
-	
 func randFloats(min, max int, n int) []float32 {
 	res := make([]float32, n)
 	for i := range res {
@@ -145,7 +142,6 @@ func randFloats(min, max int, n int) []float32 {
 	}
 	return res
 }
-
 
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())

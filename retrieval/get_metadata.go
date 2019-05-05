@@ -1,16 +1,16 @@
 package retrieval
 
 import (
-	"context"
-	"math"
 	"bytes"
-	"sync"
-	"io/ioutil"
-	db "the-SearchEngine/database"
-	"strings"
-	"regexp"
+	"context"
+	db "github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/nwihardjo/SpaghettiSearch/indexer"
 	"golang.org/x/net/html"
-	"the-SearchEngine/indexer"
+	"io/ioutil"
+	"math"
+	"regexp"
+	"strings"
+	"sync"
 )
 
 func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int, query string, phrases []string) <-chan Rank_combined {
@@ -60,7 +60,7 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			}
 
 			docMetaData.PageRank = PR
-			docMetaData.FinalRank = (0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank)*100.0
+			docMetaData.FinalRank = (0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank) * 100.0
 			docMetaData.Summary = <-summary
 
 			out <- docMetaData
@@ -70,38 +70,14 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 	return out
 }
 
-func extractWord (n *html.Node) []string{
-	var words []string
-	if n.Type == html.ElementNode {
-		tempD := n.Data
-		if !(tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav") {
-			for n.FirstChild != nil {
-				n.RemoveChild(n.FirstChild)
-			}
-		}
-	} else if n.Type == html.TextNode {
-		tempD := n.Parent.Data
-		cleaned := strings.TrimSpace(n.Data)
-		if tempD != "title" && tempD != "script" && tempD != "style" && tempD != "noscript" && tempD != "iframe" && tempD != "a" && tempD != "nav" && cleaned != "" {
-			words = append(words, cleaned)
-		}
-	}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		extractWord(c)
-	}
-
-	return words
-}
-
-
-func getSummary(docHash, query string, phrases []string)  <-chan string{
+func getSummary(docHash, query string, phrases []string) <-chan string {
 	out := make(chan string, 1)
 	go func() {
 		queryTokenised := strings.Fields(strings.Replace(strings.ToLower(query), "\"", "", -1))
 
 		// read cached files
-		htmResp, err := ioutil.ReadFile(indexer.DocsDir+docHash)
-		if err != nil  {
+		htmResp, err := ioutil.ReadFile(indexer.DocsDir + docHash)
+		if err != nil {
 			out <- ""
 		} else {
 			doc, err := html.Parse(bytes.NewReader(htmResp))
@@ -175,7 +151,7 @@ func getSummary(docHash, query string, phrases []string)  <-chan string{
 					temp := make([]string, 0, 20)
 					diff := 0
 
-					if (i-10) < 0 {
+					if (i - 10) < 0 {
 						diff = 20 - i
 						temp = append(temp, words[:i]...)
 					} else {
@@ -184,7 +160,7 @@ func getSummary(docHash, query string, phrases []string)  <-chan string{
 					}
 
 					if diff == 0 {
-						if (i+10) <= len(words) {
+						if (i + 10) <= len(words) {
 							temp = append(temp, words[i:i+10]...)
 							temp = append(temp, "...")
 							out <- strings.Join(temp, " ")
@@ -195,7 +171,7 @@ func getSummary(docHash, query string, phrases []string)  <-chan string{
 							return
 						}
 					} else {
-						if (i+diff) <= len(words) {
+						if (i + diff) <= len(words) {
 							temp = append(temp, words[i:i+diff]...)
 							temp = append(temp, "...")
 							out <- strings.Join(temp, " ")
@@ -287,7 +263,7 @@ func retrieveUrl(ctx context.Context, docHashIn <-chan string, forw []db.DB) <-c
 	out := make(chan string, len(docHashIn))
 	defer close(out)
 	var wg sync.WaitGroup
-	
+
 	for docHash := range docHashIn {
 		wg.Add(1)
 		go func(docHash string) {
@@ -377,7 +353,7 @@ func retrieveWord(ctx context.Context, wordInChan <-chan string, forw []db.DB) <
 		wg.Add(1)
 		go func(word string) {
 			defer wg.Done()
-	
+
 			var wordStr string
 			if val, err := forw[0].Get(ctx, word); err != nil {
 				panic(err)

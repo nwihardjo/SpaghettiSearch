@@ -11,7 +11,7 @@ import (
 	/*
 		"strconv"
 		"strings"
-		"the-SearchEngine/database"
+		"github.com/nwihardjo/SpaghettiSearch/g/database"
 		"time"
 	*/)
 

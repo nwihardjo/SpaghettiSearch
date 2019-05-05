@@ -3,9 +3,9 @@ package ranking
 import (
 	"context"
 	"encoding/json"
+	db "github.com/nwihardjo/SpaghettiSearch/database"
 	"log"
 	"math"
-	db "the-SearchEngine/database"
 )
 
 // table 1 key: docHash (type: string) value: list of child (type: []string)

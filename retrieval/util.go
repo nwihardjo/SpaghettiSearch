@@ -1,10 +1,10 @@
 package retrieval
 
 import (
+	db "github.com/nwihardjo/SpaghettiSearch/database"
 	"regexp"
 	"sort"
 	"strings"
-	db "the-SearchEngine/database"
 	"time"
 )
 
@@ -30,7 +30,7 @@ type Rank_combined struct {
 	Children      []string          `json:"Children"`
 	Parents       []string          `json:"Parents"`
 	Words_mapping map[string]uint32 `json:"Words_mapping"`
-	Summary	      string		`json:"Summary"`
+	Summary       string            `json:"Summary"`
 	PageRank      float64           `json:"PageRank"`
 	FinalRank     float64           `json:"FinalRank"`
 }
@@ -96,7 +96,7 @@ func resultFormat(metadata db.DocInfo, PR float64, finalRank float64, summary st
 	if len(metadata.Page_title) == 0 {
 		title = metadata.Url.Host
 	} else {
-		title = strings.Join(metadata.Page_title, " ");
+		title = strings.Join(metadata.Page_title, " ")
 	}
 
 	return Rank_combined{
