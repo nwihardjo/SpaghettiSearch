@@ -1,4 +1,4 @@
-# SearchSpaghetti: A Concurrent Search Engine
+# SpaghettiSearch: A Concurrent Search Engine
 
 Fully-functioning search engine built on top of Golang to satisfy HKUST COMP4321 requirements.
 

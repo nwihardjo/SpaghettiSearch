@@ -100,11 +100,19 @@ func main() {
 		defer bdb.Close(ctx, cancel)
 	}
 
-	// start server
+	// initialise server
 	router := mux.NewRouter()
-	log.Print("Server is running")
 	router.HandleFunc("/query", GetWebpages)
 	router.HandleFunc("/query/{terms}", GetWebpages).Methods("GET")
 	router.HandleFunc("/wordlist/{pre}", GetWordList).Methods("GET")
+
+	// render react app
+	buildPath := "./interface/build/"
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir(buildPath)))
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(buildPath+"static/"))))
+
+	
+	// start the server
+	log.Print("\n\nServer is running")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
