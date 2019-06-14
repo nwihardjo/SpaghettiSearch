@@ -76,5 +76,5 @@
 [metadata.heroku]
   root-package = "github.com/nwihardjo/SpaghettiSearch"
   go-version = "1.12.4"
-  install = ["./cmd/server/server.go", "./cmd/crawl_update/start_crawl.go"]
+  install = ["/cmd/crawl_update/start_crawl.go", "/cmd/server/server.go"]
   ensure = "True"
