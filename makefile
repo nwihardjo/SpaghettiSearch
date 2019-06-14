@@ -5,7 +5,7 @@ dep:
 
 all: dep clean
 	go build cmd/start_crawl.go
-	go build rest-api/server.go
+	go build cmd/server.go
 
 clean:
 	rm -f start_crawl server
