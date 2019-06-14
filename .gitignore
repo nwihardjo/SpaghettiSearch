@@ -5,5 +5,5 @@ db_data/
 the-SearchEngine*
 *.orig
 docs/
-server
+./server
 start_crawl
