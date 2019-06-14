@@ -76,5 +76,4 @@
 [metadata.heroku]
   root-package = "SpaghettiSearch"
   go-version = "1.12.4"
-  install = ["./cmd/server/", "./cmd/crawl_update/"]
   ensure = "True"
