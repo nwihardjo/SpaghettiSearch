@@ -9,6 +9,7 @@ import (
 	"github.com/nwihardjo/SpaghettiSearch/retrieval"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"time"
 )
@@ -117,7 +118,6 @@ func main() {
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir(buildPath)))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(buildPath+"static/"))))
 
-	
 	// start the server
 	log.Print("\n\nServer is running")
 	log.Fatal(http.ListenAndServe(":"+port, router))
