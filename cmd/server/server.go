@@ -89,6 +89,8 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		log.Fatal("$PORT must be set")
+	} else {
+		port = "8080"
 	}
 
 	// initialise db connection
