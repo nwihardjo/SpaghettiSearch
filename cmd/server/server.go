@@ -84,6 +84,12 @@ func GetWordList(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// bind to port for heroku deployment
+	port := os.Getenv("PORT")
+	if port == "" {
+		log.Fatal("$PORT must be set")
+	}
+
 	// initialise db connection
 	ctx, cancel := context.WithCancel(context.TODO())
 	log_, _ := logger.New("test", 1)
@@ -114,5 +120,5 @@ func main() {
 	
 	// start the server
 	log.Print("\n\nServer is running")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }

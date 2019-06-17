@@ -1,0 +1,100 @@
+2019-06-16T13:32:28.086863+00:00 app[web.1]: Server is running
+2019-06-16T13:33:26.269315+00:00 heroku[web.1]: State changed from starting to crashed
+2019-06-16T13:33:26.170328+00:00 heroku[web.1]: Error R10 (Boot timeout) -> Web process failed to bind to $PORT within 60 seconds of launch
+2019-06-16T13:33:26.170328+00:00 heroku[web.1]: Stopping process with SIGKILL
+2019-06-16T13:33:26.250973+00:00 heroku[web.1]: Process exited with status 22
+2019-06-16T13:33:26.189471+00:00 app[web.1]: Error waiting for process to terminate: No child processes
+2019-06-16T13:38:55.543714+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/favicon.ico" host=spaghetti-search.herokuapp.com request_id=36988ce4-8838-476f-ac0c-7d80e3135dbb fwd="175.159.126.10" dyno= connect= service= status=503 bytes= protocol=http
+2019-06-16T13:48:56.588327+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/favicon.ico" host=spaghetti-search.herokuapp.com request_id=6b44f513-a5f7-47da-9d0b-1163c72867e6 fwd="175.159.126.10" dyno= connect= service= status=503 bytes= protocol=http
+2019-06-16T13:53:14.146570+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/favicon.ico" host=spaghetti-search.herokuapp.com request_id=df691ec2-5818-41da-adfb-25c0a8865cfa fwd="175.159.126.10" dyno= connect= service= status=503 bytes= protocol=http
+2019-06-16T13:56:09.567626+00:00 heroku[web.1]: State changed from crashed to starting
+2019-06-16T13:56:10.760357+00:00 heroku[web.1]: Starting process with command `bin/server`
+2019-06-16T13:56:13.261909+00:00 app[web.1]: [heroku-exec] Starting
+2019-06-16T13:56:13.300813+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.379450+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.397986+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.417376+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.437464+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.452789+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.466502+00:00 app[web.1]: badger 2019/06/16 13:56:13 INFO: All 0 tables opened in 0s
+2019-06-16T13:56:13.467826+00:00 app[web.1]: 2019/06/16 13:56:13
+2019-06-16T13:56:13.467828+00:00 app[web.1]: 
+2019-06-16T13:56:13.467830+00:00 app[web.1]: Server is running
+2019-06-16T13:56:53.859795+00:00 heroku[web.1]: State changed from crashed to starting
+2019-06-16T13:57:11.220827+00:00 heroku[web.1]: State changed from starting to crashed
+2019-06-16T13:57:11.116936+00:00 heroku[web.1]: Error R10 (Boot timeout) -> Web process failed to bind to $PORT within 60 seconds of launch
+2019-06-16T13:57:11.117057+00:00 heroku[web.1]: Stopping process with SIGKILL
+2019-06-16T13:57:11.205978+00:00 heroku[web.1]: Process exited with status 22
+2019-06-16T13:57:11.137482+00:00 app[web.1]: Error waiting for process to terminate: No child processes
+2019-06-16T13:58:57.157531+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/favicon.ico" host=spaghetti-search.herokuapp.com request_id=c5f3dff1-472d-4135-a1e3-cdad19261e6e fwd="175.159.126.10" dyno= connect= service= status=503 bytes= protocol=http
+2019-06-16T14:40:58.923138+00:00 heroku[web.1]: State changed from crashed to starting
+2019-06-16T14:41:00.962541+00:00 heroku[web.1]: Starting process with command `bin/server`
+2019-06-16T14:41:04.093901+00:00 app[web.1]: [heroku-exec] Starting
+2019-06-16T14:41:04.122482+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.139042+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.158736+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.169044+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.190925+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.211529+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.233236+00:00 app[web.1]: badger 2019/06/16 14:41:04 INFO: All 0 tables opened in 0s
+2019-06-16T14:41:04.234778+00:00 app[web.1]: 2019/06/16 14:41:04
+2019-06-16T14:41:04.234781+00:00 app[web.1]: 
+2019-06-16T14:41:04.234783+00:00 app[web.1]: Server is running
+2019-06-16T14:42:01.182345+00:00 heroku[web.1]: State changed from starting to crashed
+2019-06-16T14:42:01.028976+00:00 heroku[web.1]: Error R10 (Boot timeout) -> Web process failed to bind to $PORT within 60 seconds of launch
+2019-06-16T14:42:01.029175+00:00 heroku[web.1]: Stopping process with SIGKILL
+2019-06-16T14:42:01.162604+00:00 heroku[web.1]: Process exited with status 137
+2019-06-16T16:12:32.785790+00:00 heroku[web.1]: State changed from crashed to starting
+2019-06-16T16:12:33.970914+00:00 heroku[web.1]: Starting process with command `bin/server`
+2019-06-16T16:12:36.681740+00:00 app[web.1]: [heroku-exec] Starting
+2019-06-16T16:12:36.693392+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.710874+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.727180+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.743560+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.762695+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.786289+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.805268+00:00 app[web.1]: badger 2019/06/16 16:12:36 INFO: All 0 tables opened in 0s
+2019-06-16T16:12:36.806131+00:00 app[web.1]: 2019/06/16 16:12:36
+2019-06-16T16:12:36.806133+00:00 app[web.1]: 
+2019-06-16T16:12:36.806135+00:00 app[web.1]: Server is running
+2019-06-16T16:13:34.692820+00:00 heroku[web.1]: State changed from starting to crashed
+2019-06-16T16:13:34.566352+00:00 heroku[web.1]: Error R10 (Boot timeout) -> Web process failed to bind to $PORT within 60 seconds of launch
+2019-06-16T16:13:34.566471+00:00 heroku[web.1]: Stopping process with SIGKILL
+2019-06-16T16:13:34.669809+00:00 heroku[web.1]: Process exited with status 137
+2019-06-16T19:09:29.485107+00:00 heroku[web.1]: State changed from crashed to starting
+2019-06-16T19:09:30.941052+00:00 heroku[web.1]: Starting process with command `bin/server`
+2019-06-16T19:09:33.934138+00:00 app[web.1]: [heroku-exec] Starting
+2019-06-16T19:09:33.961217+00:00 app[web.1]: badger 2019/06/16 19:09:33 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:33.981409+00:00 app[web.1]: badger 2019/06/16 19:09:33 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:34.008101+00:00 app[web.1]: badger 2019/06/16 19:09:34 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:34.022739+00:00 app[web.1]: badger 2019/06/16 19:09:34 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:34.047584+00:00 app[web.1]: badger 2019/06/16 19:09:34 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:34.057532+00:00 app[web.1]: badger 2019/06/16 19:09:34 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:34.070120+00:00 app[web.1]: badger 2019/06/16 19:09:34 INFO: All 0 tables opened in 0s
+2019-06-16T19:09:34.071691+00:00 app[web.1]: 2019/06/16 19:09:34
+2019-06-16T19:09:34.071693+00:00 app[web.1]: 
+2019-06-16T19:09:34.071695+00:00 app[web.1]: Server is running
+2019-06-16T19:10:31.312743+00:00 heroku[web.1]: State changed from starting to crashed
+2019-06-16T19:10:31.197823+00:00 heroku[web.1]: Error R10 (Boot timeout) -> Web process failed to bind to $PORT within 60 seconds of launch
+2019-06-16T19:10:31.198089+00:00 heroku[web.1]: Stopping process with SIGKILL
+2019-06-16T19:10:31.294111+00:00 heroku[web.1]: Process exited with status 22
+2019-06-16T19:10:31.220727+00:00 app[web.1]: Error waiting for process to terminate: No child processes
+2019-06-17T01:02:58.337088+00:00 heroku[web.1]: State changed from crashed to starting
+2019-06-17T01:02:59.509518+00:00 heroku[web.1]: Starting process with command `bin/server`
+2019-06-17T01:03:01.677260+00:00 app[web.1]: [heroku-exec] Starting
+2019-06-17T01:03:01.692329+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.699190+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.706270+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.713815+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.721114+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.728748+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.737451+00:00 app[web.1]: badger 2019/06/17 01:03:01 INFO: All 0 tables opened in 0s
+2019-06-17T01:03:01.739495+00:00 app[web.1]: 2019/06/17 01:03:01
+2019-06-17T01:03:01.739497+00:00 app[web.1]: 
+2019-06-17T01:03:01.739499+00:00 app[web.1]: Server is running
+2019-06-17T01:04:00.233958+00:00 heroku[web.1]: State changed from starting to crashed
+2019-06-17T01:04:00.135429+00:00 heroku[web.1]: Error R10 (Boot timeout) -> Web process failed to bind to $PORT within 60 seconds of launch
+2019-06-17T01:04:00.135514+00:00 heroku[web.1]: Stopping process with SIGKILL
+2019-06-17T01:04:00.206179+00:00 heroku[web.1]: Process exited with status 22
+2019-06-17T01:04:00.155328+00:00 app[web.1]: Error waiting for process to terminate: No child processes
+2019-06-17T06:43:49.673260+00:00 heroku[router]: at=error code=H10 desc="App crashed" method=GET path="/favicon.ico" host=spaghetti-search.herokuapp.com request_id=0701b7ee-c45a-420f-9fbe-7a0ab8d88b72 fwd="175.159.126.10" dyno= connect= service= status=503 bytes= protocol=http
