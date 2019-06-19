@@ -1,2 +1,2 @@
 #release: bin/crawl_update
-web: bin/server
+app: bin/server
