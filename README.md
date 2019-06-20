@@ -1,9 +1,9 @@
 # SpaghettiSearch: A Concurrent Search Engine
 
-Fully-functioning search engine built on top of Golang to satisfy HKUST COMP4321 requirements.
+Fully-functioning search engine built on top of Golang to satisfy HKUST COMP4321 requirements.It is built using Golang as its backend, and React as its frontend.
 
 ## Live Demo
-http://vml1wk024.cse.ust.hk/ lmk if the link doesn't work.
+http://spaghetti-search.herokuapp.com/
 
 ## Features
 - Combination of PageRank and vector-space model to rank the result
@@ -33,6 +33,7 @@ $ go get github.com/nwihardjo/SpaghettiSearch
 ### Frontend
 
 - Install node and npm from [here](https://www.npmjs.com/get-npm)
+- The build has been uploaded. No need to install node to get this running.
 
 ### Dependencies
 
@@ -40,18 +41,13 @@ $ go get github.com/nwihardjo/SpaghettiSearch
 
 ### Building
 
-- Run `make` in the project root directory. It will install the necessary binary packages as well as install dependendcies
-- Run the crawler and specify the argument needed as below, then spin up the backend server
+- Run `make` in the project root directory. It will install the necessary binary packages to `bin/` directory, as well as install dependendcies
+- Run the crawler and specify the argument needed as below, then spin up the server. The backend and React server has been integrated, so that only one server by Golang needed to be started.
 ```bash
-$ ./start_crawl [-numPages=<number of pages to be crawled>] [-startURL=<starting entry point for the crawler to crawl>] [-domainOnly=<whether webpages to be crawled only in the domain of given starting URL)]
-$ ./server
+$ ./bin/start_crawl [-numPages=<number of pages to be crawled>] [-startURL=<starting entry point for the crawler to crawl>] [-domainOnly=<whether webpages to be crawled only in the domain of given starting URL)]
+$ ./bin/server
 ```
-- Finally, install and run the UI server by running command below. It will automatically redirect you to the port which the server is running
-```bash
-$ cd interface/
-$ npm install
-$ npm start
-```
+- Head up to your browser, and go to `localhost:8080`. The server is hosted on port 8080, or check the output of your terminal.
 
 ## Contributor
 - [Nathaniel Wihardjo](https://github.com/nwihardjo)

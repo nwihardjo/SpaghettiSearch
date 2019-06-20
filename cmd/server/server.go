@@ -119,8 +119,6 @@ func main() {
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir(buildPath)))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(buildPath+"static/"))))
 
-	forw[0].Debug_Print(ctx)
-
 	// start the server
 	log.Print("\n\nServer is running on port ", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
