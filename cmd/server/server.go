@@ -88,8 +88,7 @@ func main() {
 	// bind to port for heroku deployment
 	port := os.Getenv("PORT")
 	if port == "" {
-		log.Fatal("$PORT must be set")
-	} else {
+		log.Printf("$PORT must be set")
 		port = "8080"
 	}
 
@@ -121,6 +120,6 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(buildPath+"static/"))))
 
 	// start the server
-	log.Print("\n\nServer is running")
+	log.Print("\n\nServer is running on port ", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }
