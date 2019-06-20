@@ -115,7 +115,7 @@ func main() {
 	router.HandleFunc("/wordlist/{pre}", GetWordList).Methods("GET")
 
 	// render react app
-	buildPath := "../interface/build/"
+	buildPath := "./interface/build/"
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir(buildPath)))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(buildPath+"static/"))))
 
