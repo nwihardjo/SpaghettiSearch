@@ -5,6 +5,6 @@ db_data/
 the-SearchEngine*
 *.orig
 docs/
-./server
 start_crawl
 temp.txt
+./bin
