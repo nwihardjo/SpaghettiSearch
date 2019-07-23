@@ -23,7 +23,7 @@ import (
 type URLHash [16]byte
 
 func main() {
-	numOfPages := flag.Int("numPages", 300, "-numPages=<number_of_pages_crawled>")
+	numOfPages := flag.Int("numPages", 500, "-numPages=<number_of_pages_crawled>")
 	startURL := flag.String("startURL", "https://www.cse.ust.hk", "-startURL=<crawler_entry_point>")
 	domainOnly := flag.Bool("domainOnly", true, "-domainOnly=<crawl_only_domain_given_domain_or_not>")
 	flag.Parse()
@@ -67,6 +67,14 @@ func main() {
 	for _, bdb := range forw {
 		defer bdb.Close(ctx, cancel)
 	}
+
+	// parse ODP directory for context-sensitive PageRank
+	// parsing will only be done once, and not in parallel as it can create issue with the too many pipes or sockets to be opened
+	timeODP := time.Now()
+	if temp, _ := forw[5].Iterate(ctx); len(temp.KV) == 0 {
+		crawler.ParseODP(ctx, inv, forw)
+	}
+	ODPCrawlTime := time.Since(timeODP)
 
 	queue.In() <- []string{"", *startURL}
 
@@ -159,16 +167,15 @@ func main() {
 	queue.Close()
 
 	fmt.Println("\nTotal visited length:", len(visited))
+	fmt.Println("\nTotal crawling ODP: ", ODPCrawlTime)
 	fmt.Println("\nTotal crawling and indexing time: " + time.Now().Sub(start).String())
 
-	//inv[1].Debug_Print(ctx)
 	// perform database update
 	timer := time.Now()
-	ranking.UpdatePagerank(ctx, 0.85, 1e-20, forw)
+	ranking.UpdateTopicSensitivePagerank(ctx, 0.75, 1e-20, forw)
 	ranking.UpdateTermWeights(ctx, &inv[0], forw, "title")
 	ranking.UpdateTermWeights(ctx, &inv[1], forw, "body")
 
-	//inv[1].Debug_Print(ctx)
 	fmt.Println("Updating pagerank and idf takes", time.Since(timer))
 	fmt.Println("\nTotal elapsed time: ", time.Now().Sub(start).String())
 }

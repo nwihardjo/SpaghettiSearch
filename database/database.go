@@ -77,7 +77,6 @@ type (
 		valType string
 	}
 )
-
 /*
 	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)
 refer to `noschema_schema.go` for each table's key and value data types
@@ -85,10 +84,13 @@ refer to `noschema_schema.go` for each table's key and value data types
 	\return: list of inverted tables, list of forward tables (type: []DB), error
 		inv[0]: inverted table for keywords in title section
 		inv[1]: inverted table for keywords in body section
+		inv[2]: inverted table for keywords on each category in topic-sensitive pageRank
 		forw[0]: forward table for wordHash (wordId) to word mapping
 		forw[1]: forward table for docHash (docId) to DocInfo mapping
 		forw[2]: forward table for docHash to list of its child
 		forw[3]: forward table for docHash to pageRank value
+		forw[4]: forward table for docHash to its page magnitude for vector space model calculation
+		forw[5]: forward table for universal damping vector for each category in topic-sensitive pageRank
 */
 
 func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, err error) {
@@ -102,14 +104,16 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 	inverted := [][]string{
 		[]string{"invKeyword_title/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
 		[]string{"invKeyword_body/", strconv.Itoa(loadMode), "string", "map[string][]float32"},
+		[]string{"invTopic_PR/", strconv.Itoa(loadMode), "string", "map[string]uint32"},
 	}
 
 	forward := [][]string{
 		[]string{"WordHash_word/", strconv.Itoa(loadMode), "string", "string"},
 		[]string{"DocHash_docInfo/", strconv.Itoa(loadMode), "string", "DocInfo"},
 		[]string{"DocHash_children/", strconv.Itoa(loadMode), "string", "[]string"},
-		[]string{"DocHash_rank/", strconv.Itoa(loadMode), "string", "float64"},
+		[]string{"DocHash_rank/", strconv.Itoa(loadMode), "string", "map[string]float64"},
 		[]string{"DocHash_magnitude/", strconv.Itoa(loadMode), "string", "map[string]float64"},
+		[]string{"Topic_damping/", strconv.Itoa(loadMode), "string", "float64"},
 	}
 
 	// create directory if not exist

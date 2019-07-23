@@ -4,17 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	db "github.com/nwihardjo/SpaghettiSearch/database"
+	"strconv"
 	"log"
 	"math"
 )
 
 // table 1 key: docHash (type: string) value: list of child (type: []string)
 // table 2 key: docHash (type: string) value: ranking (type: float64)
+ 
+type topicPR map[string]float64
 
-func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB) {
+func UpdateTopicSensitivePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB) {
 	log.Printf("Ranking with damping factor='%f', convergence_criteria='%f'", dampingFactor, convergenceCriterion)
 
-	// get the data
+	// web nodes with their corresponding children
 	nodesCompressed, err := forward[2].Iterate(ctx)
 	if err != nil {
 		panic(err)
@@ -43,9 +46,46 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 		setWebNodes = append(setWebNodes, k)
 	}
 
+	// retrieve the categories, to be updated each
+	categoryCompressed, err := forward[5].Iterate(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	// TODO: to be optimised with goroutines
+	biasedRank := make(map[string]map[string]float64, len(categoryCompressed.KV))
+	for _, kv := range categoryCompressed.KV {
+		if val, err := strconv.Atoi(string(kv.Value)); err == nil {
+			log.Printf("number of webnodes in %s is %d", string(kv.Key), val)
+			biasedRank[string(kv.Key)] = updatePagerank(ctx, dampingFactor, convergenceCriterion, forward, setWebNodes, webNodes, val)
+		} else {
+			panic(err)
+		}
+		
+	}
+
+	// aggregate final ranking to a single map for populating DB
+	bw := forward[3].BatchWrite_init(ctx)
+	defer bw.Cancel(ctx)
+
+	for _, webNode := range setWebNodes {
+		PR := make(map[string]float64, len(categoryCompressed.KV))
+		for category, ranks := range biasedRank {
+			PR[category] = ranks[webNode]
+		}
+
+		if err := bw.BatchSet(ctx, webNode, PR); err != nil {
+			panic(err)
+		}
+	}
+	
+	if err = bw.Flush(ctx); err != nil {
+		panic(err)
+	}
+}
+
+func updatePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB, setWebNodes []string, webNodes map[string][]string, n int) map[string]float64 {
 	// use number of web nodes for more efficient memory allocation
-	n := len(setWebNodes)
-	log.Printf("number of webpages indexed %d", n)
 	currentRank := make(map[string]float64, n)
 	lastRank := make(map[string]float64, n)
 
@@ -68,7 +108,8 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 			}
 		}
 
-		// perform single power iteration, pass by reference. Get totalValue for normalisation
+		// perform single power iteration, pass by reference
+		// get totalValue for normalisation
 		totalValue := computeRankInherited(currentRank, lastRank, dampingFactor, webNodes)
 		totalValue += (teleportProbs * float64(len(currentRank)))
 
@@ -79,13 +120,9 @@ func UpdatePagerank(ctx context.Context, dampingFactor float64, convergenceCrite
 			lastChange += math.Abs(currentRank[docHash] - lastRank[docHash])
 		}
 
-		log.Printf("Pagerank iteration #%d delta=%f", iteration, lastChange)
+		// log.Printf("Pagerank iteration #%d delta=%f", iteration, lastChange)
 	}
-	// store to database
-	if err = saveRanking(ctx, forward[3], currentRank); err != nil {
-		panic(err)
-	}
-	return
+	return currentRank
 }
 
 func computeRankInherited(currentRank map[string]float64, lastRank map[string]float64, dampingFactor float64, webNodes map[string][]string) float64 {
@@ -109,7 +146,12 @@ func computeRankInherited(currentRank map[string]float64, lastRank map[string]fl
 	return totalValue
 }
 
-func saveRanking(ctx context.Context, table db.DB, currentRank map[string]float64) (err error) {
+func saveRanking(ctx context.Context, table db.DB, currentRank map[string]float64, category string) (err error) {
+	// rank, err := forward[5].Iterate(ctx)
+	if err != nil {
+		panic(err)
+	}
+
 	bw := table.BatchWrite_init(ctx)
 	defer bw.Cancel(ctx)
 
