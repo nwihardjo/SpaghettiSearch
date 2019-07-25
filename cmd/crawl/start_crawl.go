@@ -23,7 +23,7 @@ import (
 type URLHash [16]byte
 
 func main() {
-	numOfPages := flag.Int("numPages", 500, "-numPages=<number_of_pages_crawled>")
+	numOfPages := flag.Int("numPages", 300, "-numPages=<number_of_pages_crawled>")
 	startURL := flag.String("startURL", "https://www.cse.ust.hk", "-startURL=<crawler_entry_point>")
 	domainOnly := flag.Bool("domainOnly", true, "-domainOnly=<crawl_only_domain_given_domain_or_not>")
 	flag.Parse()
@@ -50,7 +50,7 @@ func main() {
 		domain = temp.Hostname()
 	}
 
-	maxThreadNum := 500
+	maxThreadNum := 300
 	sem := semaphore.NewWeighted(int64(maxThreadNum))
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()
