@@ -50,7 +50,7 @@ func main() {
 		domain = temp.Hostname()
 	}
 
-	maxThreadNum := 300
+	maxThreadNum := 500
 	sem := semaphore.NewWeighted(int64(maxThreadNum))
 	visited := make(map[URLHash]bool)
 	queue := channels.NewInfiniteChannel()

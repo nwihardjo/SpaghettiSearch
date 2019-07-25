@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	db "github.com/nwihardjo/SpaghettiSearch/database"
-	"strconv"
 	"log"
 	"math"
 )
 
 // table 1 key: docHash (type: string) value: list of child (type: []string)
 // table 2 key: docHash (type: string) value: ranking (type: float64)
- 
-type topicPR map[string]float64
 
 func UpdateTopicSensitivePagerank(ctx context.Context, dampingFactor float64, convergenceCriterion float64, forward []db.DB) {
 	log.Printf("Ranking with damping factor='%f', convergence_criteria='%f'", dampingFactor, convergenceCriterion)
@@ -55,13 +52,14 @@ func UpdateTopicSensitivePagerank(ctx context.Context, dampingFactor float64, co
 	// TODO: to be optimised with goroutines
 	biasedRank := make(map[string]map[string]float64, len(categoryCompressed.KV))
 	for _, kv := range categoryCompressed.KV {
-		if val, err := strconv.Atoi(string(kv.Value)); err == nil {
-			log.Printf("number of webnodes in %s is %d", string(kv.Key), val)
-			biasedRank[string(kv.Key)] = updatePagerank(ctx, dampingFactor, convergenceCriterion, forward, setWebNodes, webNodes, val)
-		} else {
+		val := make(map[string]float64, 2)
+		if err = json.Unmarshal(kv.Value, &val); err != nil {
 			panic(err)
 		}
-		
+
+		log.Printf("number of webnodes in %s is %d", string(kv.Key), int(val["numPages"]))
+		biasedRank[string(kv.Key)] = updatePagerank(ctx, dampingFactor, convergenceCriterion, forward, setWebNodes, webNodes, int(val["numPages"]))
+
 	}
 
 	// aggregate final ranking to a single map for populating DB
@@ -78,7 +76,7 @@ func UpdateTopicSensitivePagerank(ctx context.Context, dampingFactor float64, co
 			panic(err)
 		}
 	}
-	
+
 	if err = bw.Flush(ctx); err != nil {
 		panic(err)
 	}

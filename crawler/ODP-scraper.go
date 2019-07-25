@@ -1,25 +1,25 @@
 package crawler
 
 import (
-	"github.com/nwihardjo/SpaghettiSearch/parser"
-	db "github.com/nwihardjo/SpaghettiSearch/database"
-	"context"
 	"bytes"
+	"context"
 	"fmt"
-	"net/url"
 	"github.com/gocolly/colly"
-	"strings"
+	db "github.com/nwihardjo/SpaghettiSearch/database"
+	"github.com/nwihardjo/SpaghettiSearch/parser"
 	"golang.org/x/net/html"
-	"time"
+	"net/url"
+	"strings"
 	"sync"
+	"time"
 )
 
 type scrapedData struct {
 	Category string
-	Values map[string]uint32
+	Values   map[string]uint32
 	NumPages int
 }
-	
+
 func genTopic(listTopic []*url.URL) <-chan *url.URL {
 	out := make(chan *url.URL, len(listTopic))
 	defer close(out)
@@ -38,17 +38,17 @@ func fanInData(dataIn []<-chan *scrapedData) <-chan *scrapedData {
 			c <- dat
 		}
 	}
-	
+
 	wg.Add(len(dataIn))
 	for _, data := range dataIn {
 		go out(data)
 	}
-	
+
 	go func() {
 		wg.Wait()
 		close(c)
 	}()
-	
+
 	return c
 }
 
@@ -59,7 +59,7 @@ func ParseODP(ctx context.Context, inv []db.DB, forw []db.DB) {
 	c := colly.NewCollector(
 		colly.MaxDepth(1),
 	)
-	
+
 	// parse the top ODP topic
 	c.OnHTML("#triple", func(e *colly.HTMLElement) {
 		var listTopic []*url.URL
@@ -73,10 +73,10 @@ func ParseODP(ctx context.Context, inv []db.DB, forw []db.DB) {
 				// parseTopic(u)
 			}
 		})
-		
-		// generate commmon channel 
+
+		// generate commmon channel
 		topicIn := genTopic(listTopic)
-	
+
 		// fan-out each topic to go routine
 		topicOut := [](<-chan *scrapedData){}
 		for i := 0; i < len(listTopic); i++ {
@@ -87,7 +87,7 @@ func ParseODP(ctx context.Context, inv []db.DB, forw []db.DB) {
 		for data := range fanInData(topicOut) {
 			collector = append(collector, data)
 		}
-			
+
 	})
 
 	c.Visit("http://odp.org/")
@@ -96,12 +96,16 @@ func ParseODP(ctx context.Context, inv []db.DB, forw []db.DB) {
 
 	bw_forw := forw[5].BatchWrite_init(ctx)
 	defer bw_forw.Cancel(ctx)
-	
+
 	// aggregate scraped ODP data
 	// final maps each word to a map of category to their frequency
 	final := make(map[string]map[string]uint32)
 	for _, data := range collector {
-		if err := bw_forw.BatchSet(ctx, data.Category, float64(data.NumPages)); err != nil {
+		metadata := map[string]float64{
+			"numPages":  float64(data.NumPages),
+			"wordCount": float64(len(data.Values)),
+		}
+		if err := bw_forw.BatchSet(ctx, data.Category, metadata); err != nil {
 			panic(err)
 		}
 
@@ -120,7 +124,7 @@ func ParseODP(ctx context.Context, inv []db.DB, forw []db.DB) {
 	if err := bw_forw.Flush(ctx); err != nil {
 		panic(err)
 	}
-	
+
 	bw := inv[2].BatchWrite_init(ctx)
 	defer bw.Cancel(ctx)
 
@@ -150,11 +154,11 @@ func parseTopic(u <-chan *url.URL) <-chan *scrapedData {
 			c := colly.NewCollector(
 				colly.Async(true),
 			)
-			
-			// Limit the maximum parallelism to 300, necessary if goroutines 
+
+			// Limit the maximum parallelism to 300, necessary if goroutines
 			// are dynamically created to control the limit of simultaneous requests
-			c.Limit(&colly.LimitRule {
-				DomainGlob: "*", 
+			c.Limit(&colly.LimitRule{
+				DomainGlob:  "*",
 				Parallelism: 100,
 			})
 
@@ -168,7 +172,7 @@ func parseTopic(u <-chan *url.URL) <-chan *scrapedData {
 						// avoid webpage crawled from different topic
 						link := subCategory.Attr("href")
 						if strings.HasPrefix(link, u.Path) {
-							subCategory.Request.Visit(u.Scheme+"://"+u.Host+link)
+							subCategory.Request.Visit(u.Scheme + "://" + u.Host + link)
 						}
 					})
 				}
@@ -180,11 +184,11 @@ func parseTopic(u <-chan *url.URL) <-chan *scrapedData {
 					listEntry.ForEach("li.listings h4 a[href]", func(_ int, entry *colly.HTMLElement) {
 						entry.Request.Visit(entry.Attr("href"))
 					})
-				} 
+				}
 			})
 
 			// scrape resource
-			c.OnResponse(func (r *colly.Response) {
+			c.OnResponse(func(r *colly.Response) {
 				if r.Request.URL.Host != u.Host {
 					htmlReader := bytes.NewReader(r.Body)
 					doc, err := html.Parse(htmlReader)
@@ -216,16 +220,16 @@ func parseTopic(u <-chan *url.URL) <-chan *scrapedData {
 			c.Visit(u.String())
 			c.Wait()
 
-			ret := &scrapedData {
-				Category: strings.Replace(u.Path, "/", "", -1), 
-				Values: vectorTerm.Values,
+			ret := &scrapedData{
+				Category: strings.Replace(u.Path, "/", "", -1),
+				Values:   vectorTerm.Values,
 				NumPages: numPages,
-			}		
-			
+			}
+
 			out <- ret
 		}(topic)
 	}
-	
+
 	wg.Wait()
 	return out
 }

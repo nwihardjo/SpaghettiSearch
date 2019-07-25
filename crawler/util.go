@@ -10,7 +10,7 @@ type MapSync struct {
 }
 
 func newMapSync() *MapSync {
-	return &MapSync {
+	return &MapSync{
 		Values: make(map[string]uint32),
 	}
 }

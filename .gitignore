@@ -6,3 +6,4 @@ db_data/
 docs/
 temp.txt
 ./bin
+vendor/

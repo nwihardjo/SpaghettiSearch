@@ -10,7 +10,6 @@ import (
 
 /*
 =============================== SCHEMA DEFINITION ==========================================
-
 	Schema for inverted table for both body and title page schema:
 		key	: wordHash (type: string)
 		value	: map of docHash to list of positions (type: map[string][]uint32)
@@ -29,7 +28,6 @@ import (
 	Schema for forward table forw[4]:
 		key	: docHash (type: string)
 		value	: page magnitude (type: map[string]float64)
-
 */
 
 // DocInfo describes the document info and statistics, which serves as the value of forw[2] table (URL -> DocInfo)
@@ -180,9 +178,9 @@ func checkMarshal(k interface{}, kType string, v interface{}, vType string) (key
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val, err = json.Marshal(tempVal)
-		case "map[string]uint32": 
+		case "map[string]uint32":
 			tempVal, ok := v.(map[string]uint32)
-			if ! ok {
+			if !ok {
 				return nil, nil, ErrValTypeNotMatch
 			}
 			val, err = json.Marshal(tempVal)

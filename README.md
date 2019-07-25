@@ -6,7 +6,8 @@ Fully-functioning search engine built on top of Golang to satisfy HKUST COMP4321
 http://spaghetti-search.herokuapp.com/
 
 ## Features
-- Combination of PageRank and vector-space model to rank the result
+- Implemented [Topic-Sensitive PageRank](https://ieeexplore.ieee.org/document/1208999) (T. H. Haveliwala, 2003) with the use of query as the sole given context, and user's interest is equally reflected on every topic.
+- Combination of PageRank and Vector-Space Model to rank the result
 - Utilised anchor text and metatags suggested on [Google's paper](http://infolab.stanford.edu/pub/papers/google.pdf) to increase precision and index much more webpages
 - Make use of generator, future, and fan-in fan-out concurrency pattern in Golang to increase retrieval performance
 - Dynamic document summary retrieval 

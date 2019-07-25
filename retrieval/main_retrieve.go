@@ -17,7 +17,6 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	//---------------- QUERY PARSING ----------------//
 
 	// separate the phrase into variable phrases, and exclude them from the query
-
 	phrases := getPhrase(query)
 	for _, term := range phrases {
 		query = strings.Replace(query, "\""+string(term)+"\"", "", 1)
@@ -35,6 +34,10 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 		tempHash := md5.Sum([]byte(queryTokenised[i]))
 		queryTokenised[i] = hex.EncodeToString(tempHash[:])
 	}
+
+	// compute class probabilities conditioned on the query as sole context
+	// for topic-sensitive pagerank
+	// topicProbsChan := computeTopicProbs(ctx, inv, forw, queryTokenised)
 
 	//---------------- PHRASE RETRIEVAL ----------------//
 
@@ -80,8 +83,11 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	// fan-out to calculate final rank from PR and page magnitude
 	numFanOut = int(math.Ceil(float64(len(aggregatedDocs)) * 1.0))
 	docsOutChan := [](<-chan Rank_combined){}
+
+	// topicProbs := <-topicProbsChan
+	var topicProbs map[string]float64
 	for i := 0; i < numFanOut; i++ {
-		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised), query, phrases))
+		docsOutChan = append(docsOutChan, computeFinalRank(ctx, docsInChan, forw, len(queryTokenised)+len(phraseTokenised), query, phrases, topicProbs))
 	}
 
 	// fan-in final rank (generator pattern) and sort the result
@@ -95,6 +101,61 @@ func Retrieve(query string, ctx context.Context, forw []db.DB, inv []db.DB) []Ra
 	} else {
 		return finalResult
 	}
+}
+
+func computeTopicProbs(ctx context.Context, inv []db.DB, forw []db.DB, queryTokenised []string) <-chan map[string]float64 {
+	out := make(chan map[string]float64, 1)
+
+	go func(inv []db.DB, forw []db.DB) {
+		metadata, err := forw[5].Iterate_QuickFix(ctx)
+		if err != nil {
+			panic(err)
+		}
+
+		// aggregate each query occurrence for each topic
+		// TODO: expand the topic selection by including words contained / in the surrounding of the query terms in a particular webpage
+		topicTF := make(map[string][]float64, len(metadata))
+		for i := 0; i < len(queryTokenised); i++ {
+			var topicFreq map[string]float64
+			if val_, err := inv[2].Get(ctx, queryTokenised[i]); err != nil {
+				panic(err)
+			} else {
+				topicFreq = val_.(map[string]float64)
+			}
+
+			for topic, freq := range topicFreq {
+				if val, ok := topicTF[topic]; ok {
+					val = append(val, freq)
+					topicTF[topic] = val
+				} else {
+					temp := make([]float64, 0, len(queryTokenised))
+					temp = append(temp, freq)
+					topicTF[topic] = temp
+				}
+			}
+		}
+
+		topicProbs := make(map[string]float64, len(metadata))
+		for topic, val := range metadata {
+			if tf, ok := topicTF[topic]; ok {
+				// compute multinomial naive-Bayes classifier with max-likelihood estimates
+				var probs float64
+				for i := 0; i < len(tf); i++ {
+					probs *= (tf[i] / val["wordCount"])
+				}
+
+				// the probabilities of each topic to be chosen is equal
+				// TODO: use the probabilities of each topic as a personalisation for each user
+				topicProbs[topic] = probs / float64(len(metadata))
+			} else {
+				topicProbs[topic] = 0
+			}
+		}
+
+		out <- topicProbs
+	}(inv, forw)
+
+	return out
 }
 
 func genTermPipeline(listStr []string) <-chan string {

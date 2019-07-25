@@ -45,7 +45,7 @@ func (bwb *BadgerBatchWriter) BatchSet(ctx context.Context, key_ interface{}, va
 	}
 
 	// pass the key-value pairs in []byte to the batch writer
-	if err = bwb.batchWriter.Set(key, value, 0); err != nil {
+	if err = bwb.batchWriter.Set(key, value); err != nil {
 		return err
 	}
 	return nil

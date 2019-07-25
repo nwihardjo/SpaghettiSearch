@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/apsdehal/go-logger"
 	"github.com/dgraph-io/badger"
@@ -68,6 +69,9 @@ type (
 
 		// db iterate for server
 		IterateInv(ctx context.Context, pre string, frw0 DB) ([]string, error)
+
+		// iterate without concurrency
+		Iterate_QuickFix(ctx context.Context) (map[string]map[string]float64, error)
 	}
 
 	BadgerDB struct {
@@ -77,6 +81,7 @@ type (
 		valType string
 	}
 )
+
 /*
 	object passed on DB_init should be used as global variable, only call DB_init once (operation on database object can be concurrent)
 refer to `noschema_schema.go` for each table's key and value data types
@@ -113,7 +118,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 		[]string{"DocHash_children/", strconv.Itoa(loadMode), "string", "[]string"},
 		[]string{"DocHash_rank/", strconv.Itoa(loadMode), "string", "map[string]float64"},
 		[]string{"DocHash_magnitude/", strconv.Itoa(loadMode), "string", "map[string]float64"},
-		[]string{"Topic_damping/", strconv.Itoa(loadMode), "string", "float64"},
+		[]string{"Topic_metadata/", strconv.Itoa(loadMode), "string", "map[string]float64"},
 	}
 
 	// create directory if not exist
@@ -137,7 +142,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 			return nil, nil, err
 		}
 
-		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
+		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3], base_dir)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -151,7 +156,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 			return nil, nil, err
 		}
 
-		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3])
+		temp, err := NewBadgerDB(ctx, base_dir+v[0], logger, tempMethod, v[2], v[3], base_dir)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -161,7 +166,7 @@ func DB_init(ctx context.Context, logger *logger.Logger) (inv []DB, forw []DB, e
 	return inv, forw, nil
 }
 
-func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string) (DB, error) {
+func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMethod int, keyType string, valType string, path string) (DB, error) {
 	opts := getOpts(loadMethod, dir)
 
 	badgerDB, err := badger.Open(opts)
@@ -183,7 +188,7 @@ func NewBadgerDB(ctx context.Context, dir string, logger *logger.Logger, loadMet
 
 // helper function for ease of DB configurations tuning
 func getOpts(loadMethod int, dir string) (opts badger.Options) {
-	opts = badger.DefaultOptions
+	opts = badger.DefaultOptions(dir)
 	opts.Dir, opts.ValueDir = dir, dir
 
 	// if false, SyncWrites write into tables in RAM, write to disk when full. Increase performance but may cause loss of data
@@ -350,6 +355,37 @@ func (bdb *BadgerDB) Iterate(ctx context.Context) (*Collector, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func (bdb *BadgerDB) Iterate_QuickFix(ctx context.Context) (map[string]map[string]float64, error) {
+	ret := make(map[string]map[string]float64)
+	err := bdb.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				temp := make(map[string]float64)
+				if err := json.Unmarshal(v, &temp); err != nil {
+					return err
+				}
+				ret[string(k)] = temp
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (bdb *BadgerDB) Debug_Print(ctx context.Context) error {

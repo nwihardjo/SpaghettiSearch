@@ -10,12 +10,52 @@
   revision = "e2d15f34fcf99d5dbb871c820ec73f710fca9815"
 
 [[projects]]
-  digest = "1:6f87c0823c978a0ae67aee0975ed0bfeb34de1204dc669ebd1aae98a6572ae33"
+  digest = "1:573fa46f8d413d4bc3f7cc5e86b2c43cb21559f4fb0a19d9874d228e28fdc07c"
+  name = "github.com/PuerkitoBio/goquery"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2d2796f41742ece03e8086188fa4db16a3a0b458"
+  version = "v1.5.0"
+
+[[projects]]
+  digest = "1:66b3310cf22cdc96c35ef84ede4f7b9b370971c4025f394c89a2638729653b11"
+  name = "github.com/andybalholm/cascadia"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "901648c87902174f774fac311d7f176f8647bdaa"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:d500496d898be3381278b5b323442f1060d7fead0d2159e126ff6a60da6f8ab0"
+  name = "github.com/antchfx/htmlquery"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b8d36292614567671decfe6f96c7b8c432d3249b"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:a9f01548dc83b8617f1d74f6ea558c18e67b889915956ebe93b50948dc75e8f5"
+  name = "github.com/antchfx/xmlquery"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8bd964f5eef5a1f086493b5941caae5d3daf76f1"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:3a4202162c0d85f2a5fed5675bd35e6686c8b379c63e40ef105bf3e7d76d97f5"
+  name = "github.com/antchfx/xpath"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ce1d48779e67a1ddfb380995fe532b2e0015919c"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:efe5038e25001cc88547d8ecc9ed76bbb97c15826b9bb91b931ec30dacb4e3f1"
   name = "github.com/apsdehal/go-logger"
   packages = ["."]
   pruneopts = "UT"
-  revision = "7f202acc9de10d436c038053cfd7a60f6ae7e99a"
-  version = "1.2.0"
+  revision = "1abdf898e0242cf7027d832c3e95388315c25de6"
+  version = "1.3.0"
 
 [[projects]]
   digest = "1:e47d51dab652d26c3fba6f8cba403f922d02757a82abdc77e90df7948daf296e"
@@ -26,7 +66,7 @@
   version = "v1.7.1"
 
 [[projects]]
-  digest = "1:02047c136c0ccff3a4c52eaacf4f626aba33df9ee4d665099dd63d18ecc0e1da"
+  digest = "1:4fbd5f6e99a4091f3aba45bc3d84dd7690e441e6a1065898ac9d22b248723a43"
   name = "github.com/dgraph-io/badger"
   packages = [
     ".",
@@ -37,8 +77,8 @@
     "y",
   ]
   pruneopts = "UT"
-  revision = "deee8c7ae70bab412e4f10cfa068e0be61a8d0eb"
-  version = "v2.0.0-rc.2"
+  revision = "8454221386ae8a44416c35ef0512428c86eebb7d"
+  version = "v2.0.0-rc2"
 
 [[projects]]
   branch = "master"
@@ -73,20 +113,49 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:318f1c959a8a740366fce4b1e1eb2fd914036b4af58fbd0a003349b305f118ad"
+  digest = "1:9ae31ce33b4bab257668963e844d98765b44160be4ee98cafc44637a213e530d"
+  name = "github.com/gobwas/glob"
+  packages = [
+    ".",
+    "compiler",
+    "match",
+    "syntax",
+    "syntax/ast",
+    "syntax/lexer",
+    "util/runes",
+    "util/strings",
+  ]
+  pruneopts = "UT"
+  revision = "5ccd90ef52e1e632236f7326478d4faa74f99438"
+  version = "v0.2.3"
+
+[[projects]]
+  digest = "1:54bdbd4217a4d8b66f06422395bd6370fa20d2bf85149636d3661a1b5053c900"
+  name = "github.com/gocolly/colly"
+  packages = [
+    ".",
+    "debug",
+    "storage",
+  ]
+  pruneopts = "UT"
+  revision = "ca2f07cb3c921eec1b4993f4ff6f00f593dc3af0"
+  version = "v1.2.0"
+
+[[projects]]
+  digest = "1:573ca21d3669500ff845bdebee890eb7fc7f0f50c59f2132f2a0c6b03d85086a"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = "UT"
-  revision = "b5d812f8a3706043e23a9cd5babf2e5423744d30"
-  version = "v1.3.1"
+  revision = "6c65a5562fc06764971b7c5d05c76c75e84bdbf7"
+  version = "v1.3.2"
 
 [[projects]]
-  digest = "1:d5f97fc268267ec1b61c3453058c738246fc3e746f14b1ae25161513b7367b0c"
+  digest = "1:cbec35fe4d5a4fba369a656a8cd65e244ea2c743007d8f6c1ccb132acf9d1296"
   name = "github.com/gorilla/mux"
   packages = ["."]
   pruneopts = "UT"
-  revision = "c5c6c98bc25355028a63748a498942a6398ccd22"
-  version = "v1.7.1"
+  revision = "00bdffe0f3c77e27d2cf6f5c70232a2d3e4d9c15"
+  version = "v1.7.3"
 
 [[projects]]
   digest = "1:4ac042a9f17363a1a0095a0bb46390c9c4046d38158420db1c24cd65b68d14d4"
@@ -97,8 +166,16 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:e30ac47ee84d7d354e0a284cf742e3015400667e90aa3d6ae99c7a55da67c645"
+  name = "github.com/kennygrant/sanitize"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "06ec0d0dbcd497d01e5189b16f5263f712e61a8e"
+  version = "v1.2.4"
+
+[[projects]]
   branch = "master"
-  digest = "1:ae08d850ba158ea3ba4a7bb90f8372608172d8920644e5a6693b940a1f4e5d01"
+  digest = "1:eadbae203486b5761192111d2ee89f3948fb83777736bb5b9eb12d6c7a0c9699"
   name = "github.com/mmcloughlin/avo"
   packages = [
     "attr",
@@ -116,7 +193,7 @@
     "x86",
   ]
   pruneopts = "UT"
-  revision = "2e7d06bc7ada2979f17ccf8ebf486dba23b84fc7"
+  revision = "8f9778883698ee18d683ff2d650b587b0633c7d4"
 
 [[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
@@ -128,11 +205,27 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:374ce4704830a7b9729d8798bcb4ac796f9c7bbb6903950ec55b71332caffe31"
+  name = "github.com/saintfish/chardet"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3af4cd4741ca4f3eb0c407c034571a6fb0ea529c"
+
+[[projects]]
+  branch = "master"
   digest = "1:ab935f685b54bf0b59d7a3e89a21744cebae93b373d6d2fb8323c6dd49e45c83"
   name = "github.com/surgebase/porter2"
   packages = ["."]
   pruneopts = "UT"
   revision = "56e4718818e8dc4ea5ba6348402fc7661863732a"
+
+[[projects]]
+  digest = "1:e2933734cc52e2c304ed132ba5a8320ef21bee5022c67302abb3eeef83d6c515"
+  name = "github.com/temoto/robotstxt"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3f668f68d41cf91350a4148f4fcb6720f1472428"
+  version = "v1.1.1"
 
 [[projects]]
   digest = "1:68a7cb5028bb8bd8efa388a7eaee577f2535c99209df851afb4b49c102316cf2"
@@ -144,16 +237,18 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3b2d5612ffba5ccfee26a1fa943240fcac0e3dcc404369710688dbb85338d277"
+  digest = "1:ef3acf3fe90efa230a16eac4d9bae5b1d5d3ef9ed8d95c1e92db289220a70c77"
   name = "golang.org/x/net"
   packages = [
+    "context",
     "html",
     "html/atom",
+    "html/charset",
     "internal/timeseries",
     "trace",
   ]
   pruneopts = "UT"
-  revision = "7f726cade0ab7c929c16ce0b5b25bd201e25f39f"
+  revision = "ca1201d0de80cfde86cb01aea620983605dfe99b"
 
 [[projects]]
   branch = "master"
@@ -165,15 +260,43 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1ddfda089b8a15d92242412aabc1107b8c7a87c609c09c5b441c81dbcca0ab79"
+  digest = "1:5632b0c4d972da51b5914f09fc5c1a8535e9d8d5d937e95ef83c423a0dd67f13"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "a43fa875dd822b81eb6d2ad538bc1f4caba169bd"
+  revision = "fae7ac547cb717d141c433a2a173315e216b64c4"
+
+[[projects]]
+  digest = "1:8a0baffd5559acaa560f854d7d525c02f4fec2d4f8a214398556fb661a10f6e0"
+  name = "golang.org/x/text"
+  packages = [
+    "encoding",
+    "encoding/charmap",
+    "encoding/htmlindex",
+    "encoding/internal",
+    "encoding/internal/identifier",
+    "encoding/japanese",
+    "encoding/korean",
+    "encoding/simplifiedchinese",
+    "encoding/traditionalchinese",
+    "encoding/unicode",
+    "internal/gen",
+    "internal/language",
+    "internal/language/compact",
+    "internal/tag",
+    "internal/utf8internal",
+    "language",
+    "runes",
+    "transform",
+    "unicode/cldr",
+  ]
+  pruneopts = "UT"
+  revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
+  version = "v0.3.2"
 
 [[projects]]
   branch = "master"
-  digest = "1:f5ce0b59aeb99ebb725de7b7a35483600e5f119b4daf081e88329322a2de95bc"
+  digest = "1:5776fdf0ba8328776a7cbf3191d08e121789bf09ee71443e939219d5664a58cb"
   name = "golang.org/x/tools"
   packages = [
     "go/ast/astutil",
@@ -187,7 +310,23 @@
     "internal/semver",
   ]
   pruneopts = "UT"
-  revision = "5cec639030af3a6ada2732d9bfa1d3731ed55106"
+  revision = "8aa4eac1a7c108f74782725e959bedd2b844f738"
+
+[[projects]]
+  digest = "1:6eb6e3b6d9fffb62958cf7f7d88dbbe1dd6839436b0802e194c590667a40412a"
+  name = "google.golang.org/appengine"
+  packages = [
+    "internal",
+    "internal/base",
+    "internal/datastore",
+    "internal/log",
+    "internal/remote_api",
+    "internal/urlfetch",
+    "urlfetch",
+  ]
+  pruneopts = "UT"
+  revision = "b2f4a3cf3c67576a2ee09e1fe62656a5086ce880"
+  version = "v1.6.1"
 
 [solve-meta]
   analyzer-name = "dep"
@@ -199,6 +338,7 @@
     "github.com/dgraph-io/badger/options",
     "github.com/dgraph-io/badger/pb",
     "github.com/eapache/channels",
+    "github.com/gocolly/colly",
     "github.com/gorilla/mux",
     "github.com/juliangruber/go-intersect",
     "github.com/pkg/errors",

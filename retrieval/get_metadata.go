@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int, query string, phrases []string) <-chan Rank_combined {
+func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB, queryLength int, query string, phrases []string, topicProbs map[string]float64) <-chan Rank_combined {
 	out := make(chan Rank_combined, len(docs))
 	defer close(out)
 	var wg sync.WaitGroup
@@ -28,11 +28,17 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 			summary := getSummary(doc.DocHash, query, phrases)
 
 			// get pagerank value
-			var PR float64
+			var PR map[string]float64
 			if tempVal, err := forw[3].Get(ctx, doc.DocHash); err != nil {
 				panic(err)
 			} else {
-				PR = tempVal.(float64)
+				PR = tempVal.(map[string]float64)
+			}
+
+			// compute query-sensitive importance score
+			var sqd float64
+			for topic, prob := range topicProbs {
+				sqd += prob * PR[topic]
 			}
 
 			// get page magnitude for cossim normalisation
@@ -59,8 +65,8 @@ func computeFinalRank(ctx context.Context, docs <-chan Rank_result, forw []db.DB
 				doc.TitleRank = 0
 			}
 
-			docMetaData.PageRank = PR
-			docMetaData.FinalRank = (0.3*PR + 0.4*doc.TitleRank + 0.3*doc.BodyRank) * 100.0
+			docMetaData.PageRank = sqd
+			docMetaData.FinalRank = (0.33*sqd + 0.38*doc.TitleRank + 0.29*doc.BodyRank) * 100.0
 			docMetaData.Summary = <-summary
 
 			out <- docMetaData
